@@ -1,0 +1,30 @@
+name: Revisor coordinado · Claude y OpenAI
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: yod-review-coordinator
+  cancel-in-progress: false
+jobs:
+  review:
+    # Disabled until an owner configures the private runner, connections and billing.
+    if: github.ref == 'refs/heads/main' && vars.REVIEW_COORDINATOR_ENABLED == 'true'
+    runs-on: [self-hosted, linux, yod-review-private]
+    environment: yod-review
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Revisar la bandeja privada con relevo
+        env:
+          REVIEW_INBOX: ${{ vars.REVIEW_INBOX }}
+          REVIEW_DB: ${{ vars.REVIEW_DB }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
+        run: python3 coordinator/reviewer.py --inbox "$REVIEW_INBOX" --db "$REVIEW_DB"

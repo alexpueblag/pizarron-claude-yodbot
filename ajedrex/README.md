@@ -43,7 +43,7 @@ Abrir http://localhost:4173. No se necesita instalar paquetes para jugar. Los wo
 ```sh
 node --test tests/*.test.cjs
 npm install --ignore-scripts
-npx playwright install --with-deps webkit
+npx playwright install --with-deps webkit chromium
 npm run test:webkit
 ```
 

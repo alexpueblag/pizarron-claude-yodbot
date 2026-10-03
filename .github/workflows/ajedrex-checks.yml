@@ -25,7 +25,7 @@ jobs:
       - name: Preparar pruebas WebKit
         run: npm install --ignore-scripts
       - name: Instalar WebKit
-        run: npx playwright install --with-deps webkit
+        run: npx playwright install --with-deps webkit chromium
       - name: Comprobar iPhone en WebKit
         run: npm run test:webkit
       - name: Guardar informe y capturas

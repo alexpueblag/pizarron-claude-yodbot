@@ -27,3 +27,7 @@ El usuario informó que en iPhone veía texto sin el tablero y, cuando apareció
 ## Límites importantes
 
 Solo 18 temas tienen detector; 81 es el número de fichas del catálogo, no de detectores. Rayos X, clavadas, ataques y defensas son patrones geométricos. No existe todavía evaluación completa de todas las respuestas para asegurar ganancias. GarboChess no es Stockfish y los cinco niveles no equivalen a un Elo oficial. Las tablas por repetición y 50 jugadas se aplican automáticamente en esta primera versión. No hay sincronización ni servidor de cuentas. El aspecto y los gestos deben validarse también en el iPhone real del usuario.
+
+## Diagnóstico de recarga offline en el emulador
+
+El tablero publicado y los recorridos de juego pasaron en WebKit. `context.setOffline(true)` seguido de navegación produce un error interno de WebKit incluso con el service worker activo y controlador. Existe un reporte upstream equivalente: https://github.com/microsoft/playwright/issues/42775 . Para conservar cobertura útil, la suite prueba la emulación offline en Chromium y, por separado, comprueba en WebKit que el juego recarga desde el service worker después de apagar realmente el servidor de origen. Son perturbaciones distintas; ninguna sustituye la prueba de modo avión en el iPhone físico. No se omite ninguna de esas dos comprobaciones.

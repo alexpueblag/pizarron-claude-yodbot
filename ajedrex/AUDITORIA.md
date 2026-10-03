@@ -1,4 +1,4 @@
-# Auditoría de Ajedrex v0.4
+# Auditoría de Ajedrex v0.5
 
 Fecha: 2026-10-03. Proyecto personal de hobby de alexpueblag.
 
@@ -53,3 +53,14 @@ El tablero publicado y los recorridos de juego pasaron en WebKit. `context.setOf
 - API de búsqueda añadida a chess.js sin cambiar sus reglas públicas, probada contra generación legal y perft. Caché de búsqueda conserva historia exacta y evita guardar claves históricas grandes en partidas largas.
 
 Las nuevas pruebas incluyen positivos/negativos de todos los módulos, colores invertidos y geometrías de mate reflejadas. La revisión independiente aportó casos que siguen siendo mate legal pero dejan de corresponder al patrón anunciado. Véanse los archivos tests y el run de Actions para los resultados del commit.
+
+## Prácticas independientes (v0.5)
+
+- 60 ejemplos propios conectados con sus detectores: 17 de reconocimiento y 43 de jugadas. Cubren todos los temas clasificados como táctica/reglas.
+- Cada posición y su historial de preparación se reproducen legalmente; las líneas y las promociones incluidas se verifican con chess.js. Los mates de 2–5 se vuelven a demostrar con el buscador exacto en las pruebas.
+- Una instancia Chess independiente conserva la partida en curso. Entrar pausa/cancela cálculo del rival; cerrar reanuda el turno. La configuración de alertas no se cambia por practicar.
+- Las jugadas legales alternativas no se etiquetan como errores. Las respuestas del ejemplo avanzan solo al pedirlas, sin temporizadores que muevan piezas.
+- Pistas y lectura de solución marcan el ejercicio como completado con ayuda. El progreso se valida, se guarda por separado y viaja en las copias de seguridad; las importaciones se combinan sin reducir logros anteriores.
+- Acceso desde Practicar, las 60 fichas tácticas del Catálogo y las explicaciones de alertas.
+
+348 comprobaciones de datos/modelo cubren posiciones, detectores, todas las líneas incluidas, promociones, pistas, progreso y conservación. La interfaz simulada añade recorridos de pausa/reanudación y copias. Seis recorridos WebKit nuevos cubren práctica real, búsqueda, pistas, subpromoción, avance manual, pausa del rival y ancho de iPhone. El resultado ejecutado se consulta en Actions para el commit correspondiente.

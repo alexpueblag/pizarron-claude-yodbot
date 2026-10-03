@@ -23,7 +23,9 @@ En iPhone, abrir esa dirección en **Safari**. Tocar origen y destino o arrastra
 - 60 temas de tácticas/reglas, 16 contextos de posición o línea y 5 indicadores de origen/selección. Los datos de origen requieren una copia importada que los declare.
 - Alertas que distinguen reglas comprobadas, patrones y posibilidades; dos iconos por casilla y un contador para acceder a los demás.
 - Detección avanzada en segundo plano, prueba de mates contra todas las defensas y botón Ampliar análisis. La búsqueda limitada puede omitir tácticas; consulta DETECTORES.md.
-- Seis ejemplos, guardar en el navegador, exportar/importar JSON y copiar PGN.
+- 60 prácticas guiadas, una por cada tema táctico: 17 para reconocer patrones y 43 para probar jugadas. Pausan el rival y usan su propio tablero; cerrar vuelve a la partida.
+- Pistas, variantes paso a paso, cuatro opciones de promoción y progreso local/exportable, distinguiendo ejercicios completados con ayuda.
+- Guardar en el navegador, exportar/importar JSON y copiar PGN.
 - Caché sin conexión mediante service worker, limitada a esta carpeta.
 
 ## Cómo se interpreta la evaluación
@@ -45,6 +47,16 @@ Abre **Ayudas** para buscar una táctica y encender o apagar su interruptor. **T
 Toca un icono para abrir la explicación correspondiente. El contador «+» reúne otras ayudas de esa casilla y la tira de iconos bajo el tablero muestra todos los tipos presentes. Los candidatos tienen borde punteado. Las fases y los datos del ejercicio aparecen como etiquetas, no como marcas inventadas en una casilla.
 
 **Ampliar análisis** permite dedicar más tiempo a una posición. Puedes seguir jugando; el cálculo anterior se cancela al mover. Un análisis que se queda sin tiempo no anuncia un mate sin prueba.
+
+## Practicar los iconos
+
+Abre **Practicar** y busca un tema. Cada uno de los 60 temas de táctica/reglas tiene un ejemplo; las otras 21 fichas del catálogo describen fases, objetivos, longitudes u origen y conservan su explicación contextual.
+
+En los ejercicios de reconocimiento, toca una pieza que cumpla la función. En los de jugadas, toca origen y destino. **Pista** orienta sin mover; **Ver explicación** muestra la variante, que puedes recorrer con **Mostrar siguiente paso** y **Ver respuesta del rival**. Las respuestas no avanzan automáticamente. También puedes entrar desde una ficha del Catálogo o una alerta del tablero.
+
+La práctica acepta las alternativas incluidas en el ejemplo. Otra jugada legal se describe como tal, sin afirmar que sea mala; las combinaciones candidatas siguen identificadas como candidatas. Completar un ejemplo no es una calificación Elo ni una prueba de dominio del tema.
+
+El tablero de práctica tiene su propia partida y pausa al rival del tablero principal. **Volver a mi partida** y cerrar el panel conservan posición, historial y ayudas. El progreso se guarda localmente; **Exportar partida** también lo incluye. Importar una copia combina el progreso sin degradar un ejemplo ya completado sin ayuda.
 
 ## Que no se pierda
 
@@ -78,6 +90,7 @@ La suite WebKit usa dimensiones y gestos de iPhone 13; no reemplaza la prueba en
 - theme-ui.js: 81 pictogramas SVG y alcances; context-tactics.js: fases, presión, material y metadatos.
 - advanced-tactics.js, mate-patterns.js, mate-search.js: combinaciones, 19 familias de mate y prueba de mates forzados.
 - tactics-worker.js: integración del análisis, progreso y presupuesto fuera de la interfaz.
+- practice-data.js, practice-model.js, practice.js: 60 ejemplos, estado independiente, pistas, variantes y progreso.
 - vendor/: motores/reglas y sus avisos de licencia.
 - engine-worker.js: jugadas del rival fuera del hilo de la interfaz.
 - insights.js, review-worker.js: material, ventaja y revisión en un worker independiente.

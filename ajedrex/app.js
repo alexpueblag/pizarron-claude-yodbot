@@ -9,7 +9,7 @@ const evaluationCache=new Map();let liveId=0,liveWorker=null,liveTimer=null,live
 let game=new Chess(),startFen=game.fen(),selected=null,focusAlert=null,busy=false,worker=null,job=0,fallbackTimer=null,watchdogTimer=null,engineMode='GarboChess',cache=null,pendingPromotion=null,storageOK=true;
 let prefs={mode:'ai',human:'w',level:2,flipped:false,enabled:[...ACTIVE_THEMES],alertsVersion:4,lines:true};
 
-function backupData(){return {app:'ajedrex',version:1,prefs:{...prefs,enabled:[...prefs.enabled]},startFen,metadata:trainingMetadata,moves:game.history({verbose:true}).map(m=>({from:m.from,to:m.to,...(m.promotion?{promotion:m.promotion}:{})}))};}
+function backupData(){return {app:'ajedrex',version:1,prefs:{...prefs,enabled:[...prefs.enabled]},startFen,metadata:trainingMetadata,practiceProgress:cleanPracticeProgress(practiceProgress),moves:game.history({verbose:true}).map(m=>({from:m.from,to:m.to,...(m.promotion?{promotion:m.promotion}:{})}))};}
 function validateBackup(value){
  if(!value||value.version!==1||typeof value.startFen!=='string'||!Array.isArray(value.moves)||value.moves.length>10000)throw Error('Copia de seguridad no válida.');
  const restored=new Chess();if(!restored.load(value.startFen))throw Error('Posición inicial no válida.');
@@ -23,12 +23,12 @@ function validateBackup(value){
   alertsVersion:4,
   enabled:p.alertsVersion===4&&Array.isArray(p.enabled)?[...new Set(p.enabled.filter(t=>ACTIVE_THEMES.includes(t)))]:[...ACTIVE_THEMES]
  };
- return {restored,startFen:value.startFen,prefs:clean,metadata:validateThemeMetadata(value.metadata)};
+ return {restored,startFen:value.startFen,prefs:clean,metadata:validateThemeMetadata(value.metadata),practiceProgress:cleanPracticeProgress(value.practiceProgress)};
 }
 let startupNotice='';
 try{
  const raw=localStorage.getItem('ajedrez-pistas-v1');
- if(raw){try{const value=validateBackup(JSON.parse(raw));game=value.restored;startFen=value.startFen;prefs=value.prefs;trainingMetadata=value.metadata;}
+ if(raw){try{const value=validateBackup(JSON.parse(raw));game=value.restored;startFen=value.startFen;prefs=value.prefs;trainingMetadata=value.metadata;practiceProgress=mergePracticeProgress(practiceProgress,value.practiceProgress);}
  catch(error){startupNotice='No se pudo recuperar la partida guardada. Se conserva su copia original hasta que guardes una nueva partida.';}}
 }catch(error){storageOK=false;}
 function save(){try{localStorage.setItem('ajedrez-pistas-v1',JSON.stringify(backupData()));storageOK=true;}catch(error){storageOK=false;}}
@@ -39,7 +39,7 @@ function downloadText(name,text,type){
 }
 function exportBackup(){downloadText('ajedrex-partida.json',JSON.stringify(backupData(),null,2),'application/json');}
 function importBackup(value){
- const checked=validateBackup(value);cancelThinking();game=checked.restored;startFen=checked.startFen;prefs=checked.prefs;trainingMetadata=checked.metadata;
+ const checked=validateBackup(value);cancelThinking();game=checked.restored;startFen=checked.startFen;prefs=checked.prefs;trainingMetadata=checked.metadata;practiceProgress=mergePracticeProgress(practiceProgress,checked.practiceProgress);savePracticeProgress();
  selected=null;focusAlert=null;cache=null;save();closeSheet();render();queueOpponent();
 }
 const PIECE_ART={"p":"<circle cx=\"50\" cy=\"24\" r=\"10\"/><path d=\"M43 34h14l-3 8c-1 12 5 22 13 28H33c8-6 14-16 13-28z\"/><path d=\"M31 71h38l4 12H27z\"/>","r":"<path d=\"M27 17h11v12h8V17h9v12h8V17h11v23l-11 8 3 23H34l3-23-10-8z\"/><path d=\"M31 71h38l4 12H27z\"/><path d=\"M35 42h30M35 66h30\" fill=\"none\"/>","n":"<path d=\"M31 70c0-15 17-21 23-30l-15 8-13-8 12-19 11-5 7-7 3 12c13 8 16 24 13 49z\"/><path d=\"M31 71h40l3 12H27z\"/><path d=\"M59 27c10 12 8 26 4 35\" fill=\"none\"/><circle cx=\"45\" cy=\"29\" r=\"2.2\" fill=\"currentColor\" stroke=\"none\"/>","b":"<path d=\"M50 12c-17 12-22 25-6 36l-4 22h20l-4-22C72 37 67 24 50 12z\"/><path d=\"M54 23l-9 14M37 49h26\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/><circle cx=\"50\" cy=\"10\" r=\"3\"/>","q":"<path d=\"M26 29l13 13 11-18 11 18 13-13-9 38H35z\"/><circle cx=\"25\" cy=\"25\" r=\"5\"/><circle cx=\"50\" cy=\"20\" r=\"5\"/><circle cx=\"75\" cy=\"25\" r=\"5\"/><path d=\"M35 57h30M33 67h34\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/>","k":"<path d=\"M46 9h8v8h8v8h-8v10h-8V25h-8v-8h8z\"/><path d=\"M49 38c-16-19-31-2-19 12l8 17h24l8-17c12-14-3-31-19-12z\"/><path d=\"M35 58h30M34 67h32\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/>"};
@@ -87,13 +87,13 @@ function stopTacticalAnalysis(){
 function scheduleTacticalAnalysis(){
  const key=tacticalPositionKey();
  if(advancedState.key!==key)advancedState={key,alerts:[],status:'idle'};
- if(busy||reviewPaused||document.hidden||!prefs.enabled.length){if(tacticRequested)stopTacticalAnalysis();return;}
+ if(busy||reviewPaused||practicePaused||document.hidden||!prefs.enabled.length){if(tacticRequested)stopTacticalAnalysis();return;}
  if(tacticCache.has(key)){advancedState=tacticCache.get(key);return;}
  if(tacticRequested===key)return;
  stopTacticalAnalysis();tacticRequested=key;const id=tacticId,budgetMs=nextTacticBudget;nextTacticBudget=2600;
  advancedState={key,alerts:[],status:'working'};
  tacticTimer=setTimeout(function begin(){
-  if(id!==tacticId||key!==tacticalPositionKey()||busy||reviewPaused)return;
+  if(id!==tacticId||key!==tacticalPositionKey()||busy||reviewPaused||practicePaused)return;
   if(liveWorker){tacticTimer=setTimeout(begin,150);return;}
   const finishError=()=>{
    if(id!==tacticId)return;if(tacticWorker)tacticWorker.terminate();tacticWorker=null;
@@ -119,7 +119,7 @@ function scheduleTacticalAnalysis(){
 function renderTacticalStatus(){
  const text=!prefs.enabled.length?'Alertas apagadas':busy?'Las alertas se actualizarán después de la respuesta.':advancedState.status==='working'?'Buscando más tácticas…':advancedState.status==='error'?'Avisos básicos activos. No se completó el análisis avanzado.':advancedState.status==='limited'?'Análisis breve: puede haber otras combinaciones.':busy?'Las alertas se actualizarán después de la respuesta.':'Iconos para explorar la posición.';
  $('tacticalStatus').textContent=text;
- $('deeperTactics').disabled=busy||reviewPaused||!prefs.enabled.length||advancedState.status==='working';
+ $('deeperTactics').disabled=busy||reviewPaused||practicePaused||!prefs.enabled.length||advancedState.status==='working';
 }
 function renderThemeSummary(alerts){
  const grouped=new Map();for(const a of alerts){if(!grouped.has(a.type))grouped.set(a.type,[]);grouped.get(a.type).push(a);}
@@ -133,6 +133,7 @@ function inspectAlert(alert){
  '<p class="small">'+esc(THEME_META[alert.type]?.scope||'')+'</p><div class="btnrow"><button id="showAlertBoard" class="primary">'+(alert.move?'Ver jugada '+esc(alert.move.san||alert.move.from+'–'+alert.move.to):'Ver en el tablero')+'</button><button id="hideAlertType">Apagar esta ayuda</button></div>');
  $('showAlertBoard').onclick=()=>{closeSheet();focusAlert=alert;if(alert.move)selected=alert.move.from;render();};
  $('hideAlertType').onclick=()=>{toggleTheme(alert.type,false);closeSheet();};
+ if(PRACTICE_LESSONS.some(l=>l.id===alert.type)){const button=document.createElement('button');button.id='practiceAlert';button.className='practice-return';button.textContent='Practicar esta táctica';button.onclick=()=>openPractice(alert.type);$('sheetBody').appendChild(button);}
 }
 
 function center(s){let[x,y]=xy(s);let col=prefs.flipped?7-x:x,row=prefs.flipped?y:7-y;return[(col+.5)*12.5,(row+.5)*12.5];}
@@ -205,7 +206,7 @@ function openSheet(title,html){
  $('sheetTitle').textContent=title;$('sheetBody').innerHTML=html;$('veil').classList.add('open');$('veil').setAttribute('aria-hidden','false');
  document.body.style.overflow='hidden';$('closeSheet').focus();
 }
-function closeSheet(){ $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();scheduleTacticalAnalysis();}if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
+function closeSheet(){ $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();scheduleTacticalAnalysis();}finishPractice();if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
 function toggleTheme(id,on){if(!ACTIVE_THEMES.includes(id))return;if(on){if(!prefs.enabled.includes(id))prefs.enabled.push(id);}else prefs.enabled=prefs.enabled.filter(x=>x!==id);focusAlert=null;save();render();}
 
 function openHelps(){
@@ -231,10 +232,11 @@ function openCatalog(){
   const q=normalizeSearch($('catalogSearch').value),filter=$('catalogFilter').value;
   const rows=CATALOG.filter(t=>(filter==='all'||catalogType(t)===filter)&&normalizeSearch(t.name+' '+t.description+' '+t.group).includes(q));
   $('catalogCount').textContent=rows.length+' temas';
-  $('catalogList').innerHTML=rows.map(t=>'<details class="topic"><summary><span class="catalog-symbol">'+themeIcon(t.id)+'</span>'+esc(t.name)+'<br><span class="chip">'+esc(t.group)+'</span><span class="chip">'+(catalogType(t)==='tactic'?'Avisos en el tablero':catalogType(t)==='context'?'Indicador de posición':'Datos del ejercicio')+'</span></summary><p>'+esc(t.description)+'</p><p class="small">'+esc(THEME_META[t.id]?.scope||'')+'</p><label class="row"><strong>Mostrar avisos</strong><span class="switch"><input type="checkbox" data-theme="'+t.id+'" aria-label="Activar '+esc(t.name)+'" '+(prefs.enabled.includes(t.id)?'checked':'')+'><span></span></span></label></details>').join('')||'<p>No hay temas con esa búsqueda.</p>';
+  $('catalogList').innerHTML=rows.map(t=>'<details class="topic"><summary><span class="catalog-symbol">'+themeIcon(t.id)+'</span>'+esc(t.name)+'<br><span class="chip">'+esc(t.group)+'</span><span class="chip">'+(catalogType(t)==='tactic'?'Avisos en el tablero':catalogType(t)==='context'?'Indicador de posición':'Datos del ejercicio')+'</span></summary><p>'+esc(t.description)+'</p><p class="small">'+esc(THEME_META[t.id]?.scope||'')+'</p><label class="row"><strong>Mostrar avisos</strong><span class="switch"><input type="checkbox" data-theme="'+t.id+'" aria-label="Activar '+esc(t.name)+'" '+(prefs.enabled.includes(t.id)?'checked':'')+'><span></span></span></label>'+(PRACTICE_LESSONS.some(l=>l.id===t.id)?'<button class="soft" data-catalog-practice="'+t.id+'">Practicar este tema</button>':'')+'</details>').join('')||'<p>No hay temas con esa búsqueda.</p>';
  }
  $('catalogSearch').oninput=update;$('catalogFilter').onchange=update;
- $('catalogList').onchange=e=>{if(e.target.dataset.theme)toggleTheme(e.target.dataset.theme,e.target.checked);};update();
+ $('catalogList').onchange=e=>{if(e.target.dataset.theme)toggleTheme(e.target.dataset.theme,e.target.checked);};
+ $('catalogList').onclick=e=>{const b=e.target.closest('[data-catalog-practice]');if(b)openPractice(b.dataset.catalogPractice);};update();
 }
 function showAlerts(filter={}){
  if(!filter||(!filter.square&&!topicById[filter.type]))filter={};
@@ -244,9 +246,9 @@ function showAlerts(filter={}){
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
 function cancelThinking(){stopTacticalAnalysis();cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
+function makeMove(m){const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
- if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused)return;
+ if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused)return;
  stopTacticalAnalysis();cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
  const lv=Number(prefs.level),config=[null,{ms:70,depth:1},{ms:150,depth:2},{ms:400,depth:4},{ms:850,depth:6},{ms:1400,depth:10}][lv];
  function finish(result){
@@ -321,21 +323,10 @@ function openSettings(){
  $('about').onclick=openAbout;
 }
 function openAbout(){
- openSheet('Primera versión','<p><strong>Ajedrex · v0.4.1</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
+ openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.5</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
 }
-function openLessons(){
- openSheet('Prueba las pistas','<p>Seis posiciones preparadas para explorar los avisos. Abrir una sustituye la partida actual y activa dos jugadores para que puedas experimentar.</p>'+FIXTURES.map((f,i)=>'<button class="lesson" data-lesson="'+i+'"><strong>'+esc(f.name)+'</strong><span class="small">'+esc(topicById[f.expected].description)+'</span></button>').join('')+'<button class="primary" id="learnCatalog">Explorar los 81 temas</button>');
- $('sheetBody').onchange=null;$('sheetBody').onclick=e=>{
-  const b=e.target.closest('[data-lesson]');if(!b)return;
-  if(game.history().length&&!window.confirm('Abrir el ejemplo sustituirá la partida actual. Puedes exportarla desde Partida. ¿Continuar?'))return;
-  const f=FIXTURES[Number(b.dataset.lesson)];cancelThinking();game=new Chess(f.fen);startFen=f.fen;trainingMetadata=null;prefs.mode='local';prefs.flipped=false;
-  if(!prefs.enabled.includes(f.expected))prefs.enabled.push(f.expected);
-  selected=null;cache=null;focusAlert=null;save();closeSheet();render();
-  focusAlert=visibleAlerts().find(a=>a.type===f.expected)||null;render();
- };
- $('learnCatalog').onclick=openCatalog;
-}
+function openLessons(){openPracticeGallery();}
 
 let drag=null,suppressClickUntil=0;
 function removeDrag(){if(drag&&drag.ghost)drag.ghost.remove();drag=null;}
@@ -402,10 +393,10 @@ function cancelLiveEvaluation(){
  liveTimer=null;liveTimeout=null;liveRequested=null;
 }
 function scheduleLiveEvaluation(){
- const fen=game.fen();if(game.game_over()||busy||reviewPaused||document.hidden||liveRequested===fen||evaluationCache.has(fen))return;
+ const fen=game.fen();if(game.game_over()||busy||reviewPaused||practicePaused||document.hidden||liveRequested===fen||evaluationCache.has(fen))return;
  cancelLiveEvaluation();liveRequested=fen;const id=liveId;
  liveTimer=setTimeout(()=>{
-  if(id!==liveId||game.fen()!==fen||busy||reviewPaused)return;
+  if(id!==liveId||game.fen()!==fen||busy||reviewPaused||practicePaused)return;
   const finish=score=>{
    if(id!==liveId||game.fen()!==fen)return;
    if(liveWorker)liveWorker.terminate();liveWorker=null;if(liveTimeout)clearTimeout(liveTimeout);

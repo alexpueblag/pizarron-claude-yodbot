@@ -29,7 +29,7 @@ test('Catálogo y ayudas',async({page})=>{
  await expect(page.locator('[data-theme]:checked')).toHaveCount(81);
 });
 test('Promoción, copia de seguridad y persistencia',async({page})=>{
- await page.goto('/');await page.locator('#learnButton').tap();await page.locator('[data-lesson="4"]').tap();
+ await page.goto('/');await page.evaluate(()=>{const data=backupData();data.startFen='7k/P7/8/8/8/8/8/6K1 w - - 0 1';data.moves=[];data.prefs.mode='local';importBackup(data);});
  await page.locator('[data-square="a7"]').tap();await page.locator('[data-square="a8"]').tap();
  await expect(page.locator('[data-promote]')).toHaveCount(4);await page.locator('[data-promote="n"]').tap();
  expect(await page.evaluate(()=>game.get('a8').type)).toBe('n');
@@ -39,7 +39,7 @@ test('Promoción, copia de seguridad y persistencia',async({page})=>{
 
 test('Publicación real en GitHub Pages',async({page})=>{
  await page.goto('https://alexpueblag.github.io/pizarron-claude-yodbot/ajedrex/');
- await expect(page.locator('.version')).toContainText('v0.4');
+ await expect(page.locator('.version')).toContainText('v0.5');
  expect(await page.evaluate(()=>prefs.enabled.length)).toBe(81);
  await expect(page.locator('#board [data-square]')).toHaveCount(64);
  await expect(page.locator('#board svg[data-color="w"]')).toHaveCount(16);

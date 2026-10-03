@@ -1,6 +1,6 @@
 const PIECE_NAMES={p:'peón',n:'caballo',b:'alfil',r:'torre',q:'dama',k:'rey'};
 const VALUES={p:1,n:3,b:3,r:5,q:9,k:100};
-const ACTIVE_THEMES=['attacked','defended','undefended','check','advancedPawn','pin','skewer','xRayAttack','fork','castling','enPassant','promotion','underPromotion','doubleCheck','mate','mateIn1','discoveredAttack','discoveredCheck'];
+const ACTIVE_THEMES=["attacked","defended","undefended","insufficientDefense","check","overload","advancedPawn","advantage","anastasiaMate","arabianMate","attackingF2F7","attraction","backRankMate","balestraMate","blindSwineMate","bishopEndgame","bodenMate","castling","enPassant","capturingDefender","collinearMove","cornerMate","crushing","discoveredCheck","doubleBishopMate","dovetailMate","equality","kingsideAttack","clearance","defensiveMove","deflection","discoveredAttack","doubleCheck","endgame","epauletteMate","exposedKing","fork","hangingPiece","hookMate","interference","intermezzo","killBoxMate","pillsburysMate","morphysMate","swallowstailMate","triangleMate","vukovicMate","knightEndgame","long","master","masterVsMaster","mate","mateIn1","mateIn2","mateIn3","mateIn4","mateIn5","middlegame","oneMove","opening","operaMate","pawnEndgame","pin","promotion","queenEndgame","queenRookEndgame","queensideAttack","quietMove","rookEndgame","sacrifice","short","skewer","smotheredMate","superGM","trappedPiece","underPromotion","veryLong","xRayAttack","zugzwang","mix","playerGames"];
 function boardMap(chess){const map={};chess.board().forEach((row,r)=>row.forEach((p,f)=>{if(p)map[String.fromCharCode(97+f)+(8-r)]={...p};}));return map;}
 function xy(s){return [s.charCodeAt(0)-97,Number(s[1])-1];}
 function sq(x,y){return x>=0&&x<8&&y>=0&&y<8?String.fromCharCode(97+x)+(y+1):null;}
@@ -18,8 +18,8 @@ function attacks(map,from,to){
 }
 function attackers(map,to,color){return Object.keys(map).filter(s=>map[s].color===color&&attacks(map,s,to));}
 function analyzeChess(chess,options={}){
- const map=boardMap(chess),alerts=[],seen=new Set(),turn=chess.turn(),legal=chess.moves({verbose:true});
- function add(type,squares,message,lines=[],move=null){const key=type+':'+squares.join(',')+':'+(move?move.san:'');if(seen.has(key))return;seen.add(key);alerts.push({type,squares,message,lines,move});}
+ const map=boardMap(chess),alerts=[],seen=new Set(),turn=chess.turn(),legal=chess.game_over()?[]:chess.moves({verbose:true});
+ function add(type,squares,message,lines=[],move=null){const key=type+':'+squares.join(',')+':'+(move?move.san:'');if(seen.has(key))return;seen.add(key);alerts.push({type,squares,message,lines,move,confidence:['check','doubleCheck','mate','mateIn1','castling','enPassant','promotion','underPromotion'].includes(type)?'verified':'pattern'});}
  for(const [s,p] of Object.entries(map)){
   const enemy=p.color==='w'?'b':'w',at=attackers(map,s,enemy),def=attackers(map,s,p.color);
   if(at.length)add('attacked',[s,...at],PIECE_NAMES[p.type]+' en '+s+' bajo ataque de '+at.join(', ')+'. '+(def.length?'Hay apoyo geométrico en '+def.join(', ')+'. Comprueba si puede recapturar legalmente.':'No hay defensores geométricos.')+' Estar atacada no significa estar perdida.',at.map(a=>[a,s]));
@@ -40,7 +40,7 @@ function analyzeChess(chess,options={}){
    if(found.length!==2)continue;
    const [a,b]=found,pa=map[a],pb=map[b];
    if(pa.color!==p.color){
-    add('xRayAttack',[s,a,b],PIECE_NAMES[p.type]+' en '+s+' tiene una línea hacia '+b+' bloqueada por la pieza rival en '+a+'. Es presión por rayos X; no un ataque directo a través del bloqueo.',[[s,b]]);
+    if(pb.color!==p.color)add('xRayAttack',[s,a,b],PIECE_NAMES[p.type]+' en '+s+' tiene una línea hacia '+b+' bloqueada por la pieza rival en '+a+'. Es presión por rayos X; no un ataque directo a través del bloqueo.',[[s,b]]);
     if(pb.color===pa.color&&VALUES[pb.type]>VALUES[pa.type])add('pin',[a,s,b],PIECE_NAMES[pa.type]+' en '+a+' queda delante de '+PIECE_NAMES[pb.type]+' en '+b+'. '+(pb.type==='k'?'No puede moverse si deja al rey en jaque.':'Es una clavada relativa: puede moverse, pero expone la pieza de atrás.'),[[s,b]]);
     if(pb.color===pa.color&&VALUES[pa.type]>VALUES[pb.type])add('skewer',[a,s,b],'La pieza de mayor valor en '+a+' está delante de '+b+' en la línea de '+s+'. Es una enfilada geométrica; hay que evaluar las respuestas.',[[s,b]]);
    }else if(pb.color!==p.color&&p.color===turn){
@@ -61,7 +61,7 @@ function analyzeChess(chess,options={}){
  if(chess.in_checkmate()){
   const king=Object.keys(map).find(s=>map[s].type==='k'&&map[s].color===turn);
   add('mate',[king],'Jaque mate: no existe ninguna respuesta legal.');
- }else if(options.mateIn1){
+ }else if(options.mateIn1&&!chess.game_over()){
   const c=new Chess(chess.fen());
   for(const m of legal){c.move(m);if(c.in_checkmate())add('mateIn1',[m.from,m.to],'Mate en una comprobado: '+m.san+'.',[[m.from,m.to]],m);c.undo();}
  }

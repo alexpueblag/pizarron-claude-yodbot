@@ -1,4 +1,4 @@
-# Auditoría de Ajedrex v0.3
+# Auditoría de Ajedrex v0.4
 
 Fecha: 2026-10-03. Proyecto personal de hobby de alexpueblag.
 
@@ -36,8 +36,20 @@ El usuario informó que en iPhone veía texto sin el tablero y, cuando apareció
 
 ## Límites importantes
 
-Solo 18 temas tienen detector; 81 es el número de fichas del catálogo, no de detectores. Rayos X, clavadas, ataques y defensas son patrones geométricos. No existe todavía evaluación completa de todas las respuestas para asegurar ganancias. GarboChess no es Stockfish y los cinco niveles no equivalen a un Elo oficial. Las tablas por repetición y 50 jugadas se aplican automáticamente en esta primera versión. No hay sincronización ni servidor de cuentas. El aspecto y los gestos deben validarse también en el iPhone real del usuario.
+Los 81 temas tienen controles e implementación: 60 tácticas/reglas, 16 contextos y 5 datos de origen/selección. El alcance está documentado en DETECTORES.md. Los mates forzados verifican todas las defensas dentro del horizonte; las demás combinaciones distinguen hechos locales y candidatos. No se garantiza detectar todas las variantes de una táctica ni todas las combinaciones de una posición. GarboChess no es Stockfish y los cinco niveles no equivalen a un Elo oficial. Las tablas por repetición y 50 jugadas se aplican automáticamente en esta primera versión. No hay sincronización ni servidor de cuentas. El aspecto y los gestos deben validarse también en el iPhone real del usuario.
 
 ## Diagnóstico de recarga offline en el emulador
 
 El tablero publicado y los recorridos de juego pasaron en WebKit. `context.setOffline(true)` seguido de navegación produce un error interno de WebKit incluso con el service worker activo y controlador. Existe un reporte upstream equivalente: https://github.com/microsoft/playwright/issues/42775 . Para conservar cobertura útil, la suite prueba la emulación offline en Chromium y, por separado, comprueba en WebKit que el juego recarga desde el service worker después de apagar realmente el servidor de origen. Son perturbaciones distintas; ninguna sustituye la prueba de modo avión en el iPhone físico. No se omite ninguna de esas dos comprobaciones.
+
+## Catálogo e iconos (v0.4)
+
+- 81 pictogramas SVG diferentes, con nombre accesible y el mismo significado en tablero, explicación y controles.
+- Migración de preferencias versión 4: se encienden las 81 una vez, se respeta lo que se apague después y se preserva en JSON/localStorage.
+- Botones de alerta independientes del botón que mueve la pieza. Dos iconos y contador por casilla; el icono clicado ya no abre una alerta distinta por orden de iteración.
+- 14 detectores de combinaciones, 19 familias de mate, prueba de mate en varias jugadas, 26 contextos/ataques/metadatos adicionales.
+- Trabajo fuera del hilo táctil, respuestas vinculadas al FEN/historial/preferencias, cancelación y progreso. Ampliación de búsqueda a petición.
+- Regresiones corregidas: rayos X de ataque contra objetivo del propio bando, despeje hacia pieza ya capturada, propuestas tras tablas, flechas que apuntaban al rey sin ataque real, metadatos de verificación inventados y conservación de repetición.
+- API de búsqueda añadida a chess.js sin cambiar sus reglas públicas, probada contra generación legal y perft. Caché de búsqueda conserva historia exacta y evita guardar claves históricas grandes en partidas largas.
+
+Las nuevas pruebas incluyen positivos/negativos de todos los módulos, colores invertidos y geometrías de mate reflejadas. La revisión independiente aportó casos que siguen siendo mate legal pero dejan de corresponder al patrón anunciado. Véanse los archivos tests y el run de Actions para los resultados del commit.

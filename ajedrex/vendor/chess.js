@@ -1340,6 +1340,27 @@ const Chess = function (fen) {
     /***************************************************************************
      * PUBLIC API
      **************************************************************************/
+    // Ajedrex: worker-only search API. Moves are legal internal 0x88 objects.
+    // search_move accepts ONLY a move returned by search_moves for this position.
+    // The public move()/undo() API and SAN output remain unchanged.
+    search_moves: function (options) {
+      var result = generate_moves()
+      if (options && options.checks) {
+        for (var i = 0; i < result.length; i++) {
+          make_move(result[i])
+          result[i].givesCheck = in_check()
+          undo_move()
+        }
+      }
+      return result
+    },
+    search_move: function (move) {
+      make_move(move)
+    },
+    search_undo: function () {
+      return undo_move()
+    },
+
     load: function (fen) {
       return load(fen)
     },

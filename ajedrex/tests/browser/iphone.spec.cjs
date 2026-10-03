@@ -5,7 +5,7 @@ test('Tablero móvil: colores, toque, rival pausado y deshacer',async({page})=>{
  await expect(page.locator('#board [data-square]')).toHaveCount(64);
  await expect(page.locator('#board svg[data-color="w"]')).toHaveCount(16);
  await expect(page.locator('#board svg[data-color="b"]')).toHaveCount(16);
- await expect(page.locator('#board svg text')).toHaveCount(0);
+ await expect(page.locator('#board .piece text')).toHaveCount(0);
  await page.locator('[data-square="e2"]').tap();const before=Date.now();await page.locator('[data-square="e4"]').tap();
  await expect(page.locator('[data-square="e4"] svg[data-color="w"]')).toHaveCount(1);
  await expect.poll(()=>page.evaluate(()=>game.history().length)).toBe(2);
@@ -26,7 +26,7 @@ test('Catálogo y ayudas',async({page})=>{
  await page.locator('#catalogList summary').tap();await page.locator('[data-theme="xRayAttack"]').check();
  expect(await page.evaluate(()=>prefs.enabled.includes('xRayAttack'))).toBe(true);
  await page.locator('#closeSheet').tap();await page.locator('#helpButton').tap();await page.locator('[data-preset="all"]').tap();
- await expect(page.locator('[data-theme]:checked')).toHaveCount(18);
+ await expect(page.locator('[data-theme]:checked')).toHaveCount(81);
 });
 test('Promoción, copia de seguridad y persistencia',async({page})=>{
  await page.goto('/');await page.locator('#learnButton').tap();await page.locator('[data-lesson="4"]').tap();

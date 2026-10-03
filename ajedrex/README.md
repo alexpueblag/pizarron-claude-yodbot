@@ -19,7 +19,10 @@ En iPhone, abrir esa dirección en **Safari**. Tocar origen y destino o arrastra
 - Barra blanca y negra de ventaja, calculada por el motor en segundo plano; valor aproximado en unidades de peón desde blancas.
 - Capturas visibles junto a cada jugador, con dibujos, cantidades y balance del material que queda.
 - Evaluación final con evolución de la ventaja, momentos para aprender y posiciones/alternativas que puedes revisar sin cambiar la partida. También se puede abrir durante el juego; el rival se pausa mientras revisas.
-- 18 ayudas automáticas; catálogo de 81 fichas (75 temas de Lichess más seis ayudas propias).
+- 81 temas con iconos SVG propios y controles individuales, todos encendidos al actualizar por primera vez; después se conservan tus preferencias.
+- 60 temas de tácticas/reglas, 16 contextos de posición o línea y 5 indicadores de origen/selección. Los datos de origen requieren una copia importada que los declare.
+- Alertas que distinguen reglas comprobadas, patrones y posibilidades; dos iconos por casilla y un contador para acceder a los demás.
+- Detección avanzada en segundo plano, prueba de mates contra todas las defensas y botón Ampliar análisis. La búsqueda limitada puede omitir tácticas; consulta DETECTORES.md.
 - Seis ejemplos, guardar en el navegador, exportar/importar JSON y copiar PGN.
 - Caché sin conexión mediante service worker, limitada a esta carpeta.
 
@@ -33,7 +36,15 @@ Las capturas se cuentan desde el historial real, incluyendo captura al paso y pi
 
 ## Lo que falta
 
-Stockfish, detección automática de todas las combinaciones avanzadas, banco completo de ejercicios, Elo calibrado, pruebas en iPhone físico y sincronización entre dispositivos. El catálogo identifica las fichas sin detector. Una figura táctica no garantiza ganar material; las líneas de ataque/defensa son geométricas y una clavada puede impedir una recaptura.
+Stockfish, banco de ejercicios en línea, Elo calibrado, pruebas en iPhone físico y sincronización entre dispositivos. La cobertura de cada detector está descrita en DETECTORES.md: la búsqueda breve y las variantes geométricas reconocidas no constituyen detección exhaustiva de toda combinación posible. Una pieza clavada puede impedir una recaptura; los avisos distinguen geometría, candidatos y hechos comprobados.
+
+## Tus alertas
+
+Abre **Ayudas** para buscar una táctica y encender o apagar su interruptor. **Todas** y **Apagar** cambian el conjunto; Básico e Intermedio son atajos. Los cambios permanecen al recargar y viajan en la copia exportada.
+
+Toca un icono para abrir la explicación correspondiente. El contador «+» reúne otras ayudas de esa casilla y la tira de iconos bajo el tablero muestra todos los tipos presentes. Los candidatos tienen borde punteado. Las fases y los datos del ejercicio aparecen como etiquetas, no como marcas inventadas en una casilla.
+
+**Ampliar análisis** permite dedicar más tiempo a una posición. Puedes seguir jugando; el cálculo anterior se cancela al mover. Un análisis que se queda sin tiempo no anuncia un mate sin prueba.
 
 ## Que no se pierda
 
@@ -63,7 +74,10 @@ La suite WebKit usa dimensiones y gestos de iPhone 13; no reemplaza la prueba en
 ## Estructura
 
 - index.html, styles.css, app.js: interfaz y estados de la partida.
-- tactics.js, catalog.js: detectores, explicaciones y ejemplos.
+- tactics.js, catalog.js: reglas y patrones inmediatos, explicaciones y ejemplos.
+- theme-ui.js: 81 pictogramas SVG y alcances; context-tactics.js: fases, presión, material y metadatos.
+- advanced-tactics.js, mate-patterns.js, mate-search.js: combinaciones, 19 familias de mate y prueba de mates forzados.
+- tactics-worker.js: integración del análisis, progreso y presupuesto fuera de la interfaz.
 - vendor/: motores/reglas y sus avisos de licencia.
 - engine-worker.js: jugadas del rival fuera del hilo de la interfaz.
 - insights.js, review-worker.js: material, ventaja y revisión en un worker independiente.

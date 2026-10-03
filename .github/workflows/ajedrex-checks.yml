@@ -1,0 +1,39 @@
+name: Ajedrex - reglas y Safari
+on:
+  push:
+    branches: [main]
+    paths: ['ajedrex/**', '.github/workflows/ajedrex-checks.yml']
+  pull_request:
+    paths: ['ajedrex/**', '.github/workflows/ajedrex-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ajedrex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reglas, motor e interacción
+        run: node --test tests/*.test.cjs
+      - name: Preparar pruebas WebKit
+        run: npm install --ignore-scripts
+      - name: Instalar WebKit
+        run: npx playwright install --with-deps webkit
+      - name: Comprobar iPhone en WebKit
+        run: npm run test:webkit
+      - name: Guardar informe y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ajedrex-webkit
+          path: |
+            ajedrex/playwright-report/
+            ajedrex/test-results/
+          if-no-files-found: ignore

@@ -6,6 +6,6 @@ test('Carga sin conexión después de preparar caché',async({page,context})=>{
  await expect(page.locator('#offlineNote')).toContainText('Lista para jugar sin conexión');
  await context.setOffline(true);await page.reload();
  await expect(page.locator('#board [data-square]')).toHaveCount(64);
- await page.locator('[data-square="e2"]').tap();await page.locator('[data-square="e4"]').tap();
+ await page.locator('[data-square="e2"]').click();await page.locator('[data-square="e4"]').click();
  await expect.poll(()=>page.evaluate(()=>game.history().length)).toBe(2);
 });

@@ -118,8 +118,12 @@ test('Con todas las alertas se puede tocar y arrastrar las piezas, girar y desha
  await page.locator('#undo').tap();
  expect(await page.evaluate(()=>game.history().length)).toBe(2);
  await page.locator('#settingsButton').tap();await page.locator('#flipBoard').tap();
+ await page.locator('#board').scrollIntoViewIfNeeded();
  const source=await page.locator('[data-square="e4"]').boundingBox(),target=await page.locator('[data-square="d5"]').boundingBox();
- await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
+ const point={x:source.x+source.width/2,y:source.y+source.height/2};
+ expect(point.y).toBeGreaterThan(0);expect(target.y+target.height/2).toBeLessThan(page.viewportSize().height);
+ expect(await page.evaluate(p=>document.elementFromPoint(p.x,p.y)?.closest('[data-square]')?.dataset.square,point)).toBe('e4');
+ await page.mouse.move(point.x,point.y);await page.mouse.down();
  await page.mouse.move(target.x+target.width/2,target.y+target.height/2,{steps:8});await page.mouse.up();
  await expect(page.locator('[data-square="d5"] .piece[data-color="w"]')).toHaveCount(1);
  expect(await page.evaluate(()=>game.history().length)).toBe(3);

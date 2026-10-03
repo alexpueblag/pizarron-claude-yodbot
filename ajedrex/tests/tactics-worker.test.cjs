@@ -2,12 +2,12 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'..');
 const files=['vendor/chess.js','vendor/garbo.js','catalog.js','tactics.js','insights.js','context-tactics.js','advanced-tactics.js','mate-patterns.js','mate-search.js'];
-function run(startFen,moves=[],budgetMs=2600){
+function run(startFen,moves=[],budgetMs=2600,enabled){
  const messages=[],self={postMessage:data=>messages.push(JSON.parse(JSON.stringify(data)))};
  const context=vm.createContext({self});
  const source=files.map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n')+'\n'+fs.readFileSync(path.join(root,'tactics-worker.js'),'utf8').replace(/^importScripts\([^\n]+\);/m,'')+'\nthis.ids=ACTIVE_THEMES;this.Chess=Chess;';
  vm.runInContext(source,context);
- const data={kind:'tactics',id:42,startFen,moves,budgetMs,enabled:Array.from(context.ids)};
+ const data={kind:'tactics',id:42,startFen,moves,budgetMs,enabled:enabled||Array.from(context.ids)};
  context.self.onmessage({data});return {messages,Chess:context.Chess};
 }
 test('Worker completo: progreso, contratos y propuestas legales de todos los módulos',()=>{
@@ -36,4 +36,15 @@ test('Partida terminada no ofrece jugadas ni tácticas futuras desde el worker',
  const {messages}=run('7k/R7/5N2/8/8/8/8/K7 w - - 100 1'),last=messages[messages.length-1];
  assert.equal(last.done,true);assert.ok(last.alerts.every(a=>!a.move));
  assert.ok(!last.alerts.some(a=>/^mateIn/.test(a.type)||a.type==='arabianMate'));
+});
+
+test('Longitud funciona independientemente del interruptor de mate',()=>{
+ for(const [type,fen]of [
+  ['oneMove','7k/5Q2/6K1/8/8/8/8/8 w - - 0 1'],
+  ['short','5r1k/6pp/4Q2N/8/8/8/6PP/6K1 w - - 3 3']
+ ]){
+  const {messages}=run(fen,[],2600,[type]),last=messages[messages.length-1];
+  assert.equal(last.done,true);assert.ok(last.alerts.some(a=>a.type===type),JSON.stringify(last));
+  assert.ok(last.alerts.every(a=>a.type===type));
+ }
 });

@@ -18,18 +18,21 @@ self.onmessage=function(event){
   const currentFen=chess.fen(),evaluation={...evaluatePosition(chess,{ms:100,depth:3}),fen:currentFen};
   let previousEvaluation=null;
   const last=chess.undo();if(last){previousEvaluation={...evaluatePosition(chess,{ms:80,depth:3}),fen:chess.fen()};chess.move(last);}
-  const contextOptions={enabled:[...enabled],metadata:data.metadata,evaluation,previousEvaluation,tacticalAlerts:[...basic.alerts,...alerts]};
+  const internalTactics=[...basic.alerts,...immediate];
+  const contextOptions={enabled:[...enabled],metadata:data.metadata,evaluation,previousEvaluation,tacticalAlerts:internalTactics};
   add(run('context',()=>detectContextTactics(chess,contextOptions)));
   send(false);
   if(!chess.game_over()){
    const advanced=run('combinations',()=>detectAdvancedTactics(chess,{enabled:[...enabled],deadline:Math.min(start+budget,Date.now()+Math.min(1500,budget*.4))}));
    if(advanced){add(advanced);if(advanced.report?.complete===false){limited=true;coverage.combinations=advanced.report.reason||'budget';}}
    send(false);
-   if(['mateIn2','mateIn3','mateIn4','mateIn5'].some(id=>enabled.has(id))){
-    const forced=run('forcedMates',()=>detectForcedMates(chess,{enabled:[...enabled],maxDepthMoves:budget>3000?8:5,maxNodes:budget>3000?400000:60000,deadline:start+budget}));
-    if(forced){add(forced.alerts);if(!forced.complete){limited=true;coverage.forcedMates=forced.reason||'budget';}coverage.mateHorizon=forced.horizon;}
+   const needsLengthProof=['short','long','veryLong'].some(id=>enabled.has(id));
+   if(needsLengthProof||['mateIn2','mateIn3','mateIn4','mateIn5'].some(id=>enabled.has(id))){
+    const searchEnabled=needsLengthProof?[...new Set([...enabled,'mateIn1','mateIn2','mateIn3','mateIn4','mateIn5'])]:[...enabled];
+    const forced=run('forcedMates',()=>detectForcedMates(chess,{enabled:searchEnabled,maxDepthMoves:budget>3000?8:5,maxNodes:budget>3000?400000:60000,deadline:start+budget}));
+    if(forced){internalTactics.push(...forced.alerts);add(forced.alerts);if(!forced.complete){limited=true;coverage.forcedMates=forced.reason||'budget';}coverage.mateHorizon=forced.horizon;}
    }
-   add(run('contextAfterSearch',()=>detectContextTactics(chess,{...contextOptions,tacticalAlerts:[...basic.alerts,...alerts]})));
+   add(run('contextAfterSearch',()=>detectContextTactics(chess,{...contextOptions,tacticalAlerts:[...internalTactics,...alerts]})));
   }
   send(true);
  }catch(error){self.postMessage({kind:'error',id:data.id,error:String(error)});}

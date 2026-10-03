@@ -39,6 +39,8 @@ test('Promoción, copia de seguridad y persistencia',async({page})=>{
 
 test('Publicación real en GitHub Pages',async({page})=>{
  await page.goto('https://alexpueblag.github.io/pizarron-claude-yodbot/ajedrex/');
+ await expect(page.locator('.version')).toContainText('v0.4');
+ expect(await page.evaluate(()=>prefs.enabled.length)).toBe(81);
  await expect(page.locator('#board [data-square]')).toHaveCount(64);
  await expect(page.locator('#board svg[data-color="w"]')).toHaveCount(16);
  await expect(page.locator('#board svg[data-color="b"]')).toHaveCount(16);

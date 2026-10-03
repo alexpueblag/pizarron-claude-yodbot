@@ -68,3 +68,66 @@ test('WebKit recupera el tablero cuando el servidor deja de existir',async({page
   await expect.poll(()=>page.evaluate(()=>game.history().length)).toBe(2);
  }finally{if(server.listening)await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});}
 });
+
+test('Barra de ventaja calcula con motor y cabe en iPhone',async({page})=>{
+ await page.goto('/');
+ await page.evaluate(()=>{
+  const data=backupData();data.prefs.mode='local';data.prefs.flipped=false;
+  data.startFen='7k/8/8/8/8/8/4Q3/4K3 w - - 0 1';data.moves=[];importBackup(data);
+ });
+ await expect.poll(()=>page.evaluate(()=>evaluationCache.get(game.fen())?.method),{timeout:10000}).toBe('engine');
+ expect(await page.locator('#evalWhite').evaluate(el=>parseFloat(el.style.height))).toBeGreaterThan(50);
+ await expect(page.locator('#evalBar')).toHaveAttribute('aria-label',/blancas/);
+ await expect(page.locator('#evalText')).not.toContainText('Material');
+ const bar=await page.locator('#evalBar').boundingBox(),board=await page.locator('#board').boundingBox();
+ expect(Math.abs(bar.height-board.height)).toBeLessThan(2);expect(bar.x+bar.width).toBeLessThan(board.x);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/ajedrex-ventaja-iphone.png',fullPage:true});
+});
+test('Capturas visibles, colores, giro y deshacer',async({page})=>{
+ await page.goto('/');await page.evaluate(()=>{const data=backupData();data.prefs.mode='local';importBackup(data);});
+ for(const [from,to]of [['e2','e4'],['d7','d5'],['e4','d5']]){
+  await page.locator('[data-square="'+from+'"]').tap();await page.locator('[data-square="'+to+'"]').tap();
+ }
+ await expect(page.locator('#bottomCaptures')).toContainText('1 captura');
+ await expect(page.locator('#bottomCaptures svg[data-color="b"]')).toHaveCount(1);
+ await expect(page.locator('#topCaptures')).toContainText('Sin capturas');
+ await expect(page.locator('#materialBalance')).toContainText('Blancas +1');
+ await page.locator('#settingsButton').tap();await page.locator('#flipBoard').tap();
+ await expect(page.locator('#topCaptures svg[data-color="b"]')).toHaveCount(1);
+ await expect(page.locator('#evalBar')).toHaveClass(/flipped/);
+ await page.locator('#undo').tap();
+ await expect(page.locator('#topCaptures')).toContainText('Sin capturas');
+ await expect(page.locator('#materialBalance')).toContainText('Material igualado');
+});
+test('Mate abre informe final y permite revisar sin alterar la partida',async({page})=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto('/');
+ await page.evaluate(()=>{
+  const data=backupData();data.prefs.mode='local';
+  data.moves=[{from:'f2',to:'f3'},{from:'e7',to:'e5'},{from:'g2',to:'g4'}];importBackup(data);
+ });
+ await page.locator('[data-square="d8"]').tap();await page.locator('[data-square="h4"]').tap();
+ const fen=await page.evaluate(()=>game.fen());
+ await expect(page.locator('#finalResult')).toContainText('0–1');
+ await expect(page.locator('#sheetTitle')).toHaveText('Evaluación final',{timeout:10000});
+ await expect(page.locator('.review-summary-title')).toContainText('Ganan negras',{timeout:15000});
+ expect(await page.evaluate(()=>lastReview.report.rows.length)).toBe(4);
+ await expect(page.locator('.review-chart')).toHaveCount(1);
+ await page.screenshot({path:'test-results/ajedrex-informe-iphone.png',fullPage:true});
+ await page.locator('[data-review-index="0"]').last().tap();
+ await expect(page.locator('.mini-board .sq')).toHaveCount(64);
+ await page.locator('[data-position-view="played"]').tap();
+ await page.locator('[data-position-view="best"]').tap();
+ expect(await page.evaluate(()=>game.fen())).toBe(fen);
+ await page.locator('#reviewOverview').tap();await page.locator('#closeSheet').tap();
+ await expect(page.locator('#finalReport')).toBeVisible();
+ expect(await page.evaluate(()=>game.fen())).toBe(fen);expect(errors).toEqual([]);
+});
+test('Cerrar revisión a mitad de partida reanuda al rival',async({page})=>{
+ await page.goto('/');
+ await page.evaluate(()=>{makeMove({from:'e2',to:'e4'});openGameReview();});
+ await expect(page.locator('#sheetTitle')).toHaveText('Revisión de la partida');
+ await page.locator('#closeSheet').tap();
+ await expect.poll(()=>page.evaluate(()=>game.history().length),{timeout:10000}).toBe(2);
+ expect(await page.evaluate(()=>reviewPaused)).toBe(false);
+});

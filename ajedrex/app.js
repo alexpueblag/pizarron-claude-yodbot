@@ -3,6 +3,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const topicById=Object.fromEntries(CATALOG.map(t=>[t.id,t]));
 const symbols={attacked:'!',defended:'◆',undefended:'○',check:'!',pin:'↗',skewer:'↗',xRayAttack:'⋯',fork:'⑂',advancedPawn:'↑',castling:'↔',enPassant:'×',promotion:'↑',underPromotion:'↑',doubleCheck:'!!',mate:'#',mateIn1:'#1',discoveredAttack:'↗',discoveredCheck:'+'};
 const pieceGlyph={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
+const evaluationCache=new Map();let liveId=0,liveWorker=null,liveTimer=null,liveTimeout=null,liveRequested=null,reviewJob=0,reviewWorker=null,reviewTimeout=null,reviewPaused=false,lastReview=null;
 let game=new Chess(),startFen=game.fen(),selected=null,focusAlert=null,busy=false,worker=null,job=0,fallbackTimer=null,watchdogTimer=null,engineMode='GarboChess',cache=null,pendingPromotion=null,storageOK=true;
 let prefs={mode:'ai',human:'w',level:2,flipped:false,enabled:['attacked','check','pin'],lines:true};
 
@@ -121,6 +122,7 @@ function render(){
  }
  $('storageNote').textContent=storageOK?'Guardado en este navegador. Exporta una copia desde Partida para conservarla.':'Esta vista no permite guardar automáticamente. Conserva tu partida copiando el PGN.';
  $('engineNote').textContent=prefs.mode==='ai'?engineMode+' · dificultad orientativa, sin Elo certificado':'Partida local en el mismo teléfono';
+ renderInsights();
 }
 let previousFocus=null;
 function openSheet(title,html){
@@ -129,7 +131,7 @@ function openSheet(title,html){
  $('sheetTitle').textContent=title;$('sheetBody').innerHTML=html;$('veil').classList.add('open');$('veil').setAttribute('aria-hidden','false');
  document.body.style.overflow='hidden';$('closeSheet').focus();
 }
-function closeSheet(){ $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
+function closeSheet(){ $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();}if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
 function toggleTheme(id,on){if(!ACTIVE_THEMES.includes(id))return;if(on){if(!prefs.enabled.includes(id))prefs.enabled.push(id);}else prefs.enabled=prefs.enabled.filter(x=>x!==id);focusAlert=null;save();render();}
 function openHelps(){
  const groups=[...new Set(CATALOG.filter(t=>ACTIVE_THEMES.includes(t.id)).map(t=>t.group))];
@@ -163,11 +165,11 @@ function showAlerts(){
  $('sheetBody').onchange=null;$('sheetBody').onclick=e=>{const b=e.target.closest('[data-choose-alert]');if(b){focusAlert=alerts[Number(b.dataset.chooseAlert)];selected=null;closeSheet();render();}};
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
-function cancelThinking(){job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();return true;}
+function cancelThinking(){cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
+function makeMove(m){const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
- if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy)return;
- busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
+ if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused)return;
+ cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
  const lv=Number(prefs.level),config=[null,{ms:70,depth:1},{ms:150,depth:2},{ms:400,depth:4},{ms:850,depth:6},{ms:1400,depth:10}][lv];
  function finish(result){
   if(id!==job||fen!==game.fen())return;
@@ -241,7 +243,7 @@ function openSettings(){
  $('about').onclick=openAbout;
 }
 function openAbout(){
- openSheet('Primera versión','<p><strong>Ajedrex · v0.2</strong><br>Tablero táctil, reglas legales, rival GarboChess, 18 ayudas y 81 fichas del catálogo.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Stockfish, los detectores avanzados y un banco completo de ejercicios quedan pendientes. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
+ openSheet('Primera versión','<p><strong>Ajedrex · v0.3</strong><br>Tablero táctil, reglas legales, rival GarboChess, 18 ayudas y 81 fichas del catálogo.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Stockfish, los detectores avanzados y un banco completo de ejercicios quedan pendientes. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
 }
 function openLessons(){
@@ -285,6 +287,7 @@ $('board').onpointerup=e=>{
 $('board').onpointercancel=()=>{removeDrag();selected=null;render();};
 $('board').onclick=e=>{if(Date.now()<suppressClickUntil)return;const b=e.target.closest('[data-square]');if(b)tapSquare(b.dataset.square,Boolean(e.target.closest('[data-alert-square]')));};
 
+$('finalReview').onclick=openGameReview;$('reviewButton').onclick=openGameReview;
 $('undo').onclick=undoMove;$('helpButton').onclick=openHelps;$('settingsButton').onclick=openSettings;
 $('seeAlerts').onclick=showAlerts;$('learnButton').onclick=openLessons;$('catalogButton').onclick=openCatalog;$('playButton').onclick=()=>{selected=null;focusAlert=null;render();};
 $('closeSheet').onclick=closeSheet;$('veil').onclick=e=>{if(e.target===$('veil'))closeSheet();};
@@ -297,6 +300,131 @@ document.addEventListener('keydown',e=>{
  }
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelThinking();save();render();}else queueOpponent();});
+
+/* Visible captures, position advantage and post-game review. */
+function renderCaptures(id,color,summary){
+ const captures=summary.captured[color],counts={};captures.forEach(type=>{counts[type]=(counts[type]||0)+1;});
+ const owner=prefs.mode==='ai'?(color===prefs.human?'Tú capturaste':'Rival capturó'):(color==='w'?'Blancas capturaron':'Negras capturaron');
+ $(id).innerHTML='<div class="capture-owner"><strong>'+owner+'</strong>Piezas del rival</div>'+
+ (captures.length?['q','r','b','n','p'].filter(type=>counts[type]).map(type=>'<span class="captured-group" aria-label="'+counts[type]+' '+PIECE_NAMES[type]+' capturado" title="'+counts[type]+' '+PIECE_NAMES[type]+'">'+pieceSVG({type,color:color==='w'?'b':'w'})+'<b>×'+counts[type]+'</b></span>').join(''):'<span class="captured-empty">Sin capturas todavía</span>')+
+ '<span class="capture-total">'+captures.length+' '+(captures.length===1?'captura':'capturas')+'</span>';
+}
+function paintEvaluation(score,pending){
+ $('evalWhite').style.height=scorePercent(score)+'%';
+ $('evalBar').classList.toggle('flipped',prefs.flipped);
+ $('evalBar').setAttribute('aria-label',scoreDescription(score)+'. '+scoreLabel(score)+'. Blanco indica ventaja blanca; negro indica ventaja negra.');
+ $('evalValue').textContent=scoreLabel(score);
+ $('evalText').textContent=scoreDescription(score)+(pending?' · analizando…':'')+(score.method==='engine'&&score.kind==='score'?' · estimación':'');
+}
+function cancelLiveEvaluation(){
+ liveId++;if(liveWorker)liveWorker.terminate();liveWorker=null;
+ if(liveTimer)clearTimeout(liveTimer);if(liveTimeout)clearTimeout(liveTimeout);
+ liveTimer=null;liveTimeout=null;liveRequested=null;
+}
+function scheduleLiveEvaluation(){
+ const fen=game.fen();if(game.game_over()||busy||reviewPaused||document.hidden||liveRequested===fen||evaluationCache.has(fen))return;
+ cancelLiveEvaluation();liveRequested=fen;const id=liveId;
+ liveTimer=setTimeout(()=>{
+  if(id!==liveId||game.fen()!==fen||busy||reviewPaused)return;
+  const finish=score=>{
+   if(id!==liveId||game.fen()!==fen)return;
+   if(liveWorker)liveWorker.terminate();liveWorker=null;if(liveTimeout)clearTimeout(liveTimeout);
+   const safe=score&&['score','mate','checkmate','draw'].includes(score.kind)?score:materialScore(game);
+   evaluationCache.set(fen,safe);if(evaluationCache.size>200)evaluationCache.delete(evaluationCache.keys().next().value);
+   paintEvaluation(safe,false);
+  };
+  try{
+   liveWorker=new Worker('./review-worker.js');
+   liveTimeout=setTimeout(()=>finish(null),3500);
+   liveWorker.onmessage=e=>{if(e.data&&e.data.id===id&&e.data.kind==='position')finish(e.data.score);else if(e.data&&e.data.kind==='error')finish(null);};
+   liveWorker.onerror=e=>{e.preventDefault();finish(null);};
+   liveWorker.postMessage({kind:'position',id,fen});
+  }catch(error){finish(null);}
+ },260);
+}
+function renderInsights(){
+ const material=materialSummary(game),top=prefs.flipped?'w':'b';
+ renderCaptures('topCaptures',top,material);renderCaptures('bottomCaptures',top==='w'?'b':'w',material);
+ $('materialBalance').textContent=material.balance===0?'Material igualado':(material.balance>0?'Blancas +':'Negras +')+Math.abs(material.balance)+' material';
+ const terminal=terminalScore(game),score=terminal||evaluationCache.get(game.fen())||materialScore(game);
+ paintEvaluation(score,!terminal&&!evaluationCache.has(game.fen())&&!busy);
+ $('finalReport').classList.toggle('hidden',!game.game_over());
+ $('finalResult').textContent=terminal?scoreLabel(terminal)+(terminal.kind==='draw'?' · Tablas':' · '+(terminal.winner==='w'?'Ganan blancas':'Ganan negras')):'';
+ $('finalReason').textContent=game.game_over()?statusText():'';
+ $('reviewButton').disabled=game.history().length===0;
+ $('reviewButton').textContent=game.game_over()?'Volver a evaluar la partida':'Ver análisis de la partida';
+ scheduleLiveEvaluation();
+}
+function stopReviewAnalysis(){
+ reviewJob++;if(reviewWorker)reviewWorker.terminate();reviewWorker=null;
+ if(reviewTimeout)clearTimeout(reviewTimeout);reviewTimeout=null;
+}
+function reviewKey(){return startFen+'|'+game.history().join(' ');}
+function openGameReview(){
+ const key=reviewKey(),moves=game.history({verbose:true}).map(m=>({from:m.from,to:m.to,promotion:m.promotion}));
+ cancelThinking();cancelLiveEvaluation();stopReviewAnalysis();reviewPaused=true;
+ openSheet(game.game_over()?'Evaluación final':'Revisión de la partida','<div class="review-progress"><strong id="reviewStatus">Analizando las jugadas…</strong><progress id="reviewProgress" value="0" max="'+Math.max(1,moves.length)+'"></progress><p class="small">Puedes cerrar este panel para detener el análisis. Tu partida se conserva.</p></div><div id="reviewContent"></div>');
+ if(lastReview&&lastReview.key===key){showReviewReport(lastReview.report);return;}
+ const id=reviewJob;
+ function fail(){
+  if(id!==reviewJob)return;stopReviewAnalysis();
+  if($('reviewStatus'))$('reviewStatus').textContent='No se pudo completar el análisis del motor.';
+  if($('reviewContent'))$('reviewContent').innerHTML='<p>El resultado y las capturas siguen disponibles. Cierra y vuelve a abrir para reintentar.</p>';
+ }
+ try{
+  reviewWorker=new Worker('./review-worker.js');
+  reviewTimeout=setTimeout(fail,Math.max(12000,moves.length*700+5000));
+  reviewWorker.onmessage=e=>{
+   const data=e.data;if(id!==reviewJob||!data||data.id!==id)return;
+   if(data.kind==='progress'){
+    if($('reviewStatus'))$('reviewStatus').textContent='Revisadas '+data.done+' de '+data.total+' jugadas';
+    if($('reviewProgress'))$('reviewProgress').value=data.done;
+   }else if(data.kind==='review'){
+    if(reviewTimeout)clearTimeout(reviewTimeout);if(reviewWorker)reviewWorker.terminate();reviewWorker=null;
+    lastReview={key,report:data.report};showReviewReport(data.report);
+   }else if(data.kind==='error')fail();
+  };
+  reviewWorker.onerror=e=>{e.preventDefault();fail();};
+  reviewWorker.postMessage({kind:'review',id,startFen,moves});
+ }catch(error){fail();}
+}
+function reviewChart(report){
+ const points=report.positions.map((p,i)=>[20+(i/Math.max(1,report.positions.length-1))*320,80-scoreNumber(p.score)/1000*65]);
+ const path=points.map(p=>p.join(',')).join(' ');
+ return '<svg class="review-chart" viewBox="0 0 360 160" role="img" aria-label="Evolución de la ventaja. Arriba favorece a blancas; abajo, a negras. Cada punto corresponde a media jugada."><rect x="20" y="15" width="320" height="65" fill="#f5f0df"/><rect x="20" y="80" width="320" height="65" fill="#e2e9e3"/><line x1="20" y1="80" x2="340" y2="80" stroke="#97a59a" stroke-dasharray="4 3"/><text x="23" y="29" font-size="9" fill="#476458">Blancas</text><text x="23" y="140" font-size="9" fill="#476458">Negras</text><polyline points="'+path+'" fill="none" stroke="#176d64" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+}
+function reviewMoveLabel(row){return (row.fullmove||Math.floor(row.index/2)+1)+(row.move.color==='w'?'. ':'… ')+row.move.san;}
+function showReviewReport(report){
+ if(!reviewPaused)return;
+ const terminal=report.final,whiteErrors=report.rows.filter(r=>r.move.color==='w'&&r.tone==='bad').length,blackErrors=report.rows.filter(r=>r.move.color==='b'&&r.tone==='bad').length;
+ let title=terminal?scoreLabel(terminal)+' · '+(terminal.kind==='draw'?'Tablas':terminal.winner==='w'?'Ganan blancas':'Ganan negras'):'Partida en curso';
+ const dropped=report.rows.filter(r=>r.tone==='bad'||r.tone==='notice').sort((a,b)=>(b.loss??10000)-(a.loss??10000)).slice(0,3);
+ const moves=report.rows;
+ $('sheetBody').innerHTML='<h3 class="review-summary-title">'+esc(title)+'</h3><p>'+moves.length+' medias jugadas · '+(prefs.mode==='ai'?'Rival nivel '+prefs.level:'Dos jugadores')+'</p>'+
+ '<div class="review-stats"><div class="review-stat"><span class="small">Capturas de blancas</span><strong>'+report.material.captured.w.length+'</strong><span class="small">'+whiteErrors+' jugadas para revisar</span></div><div class="review-stat"><span class="small">Capturas de negras</span><strong>'+report.material.captured.b.length+'</strong><span class="small">'+blackErrors+' jugadas para revisar</span></div></div>'+
+ reviewChart(report)+'<div class="review-legend"><span>Inicio</span><span>Ventaja limitada a ±10 en el gráfico</span><span>Final</span></div>'+
+ '<p class="review-method">Análisis orientativo de GarboChess, con búsqueda breve. Los valores son unidades aproximadas de peón, vistas desde blancas. No calculamos Elo ni una precisión certificada.</p>'+
+ (dropped.length?'<div class="group">Momentos para aprender</div>'+dropped.map(r=>'<button class="review-row '+r.tone+'" data-review-index="'+r.index+'"><span><span class="move-name">'+esc(reviewMoveLabel(r))+'</span>'+esc(r.category)+(r.suggestion?' · alternativa: '+esc(r.suggestion.san):'')+'</span><span class="review-score">'+(r.loss!==null?(r.loss/100).toFixed(1)+' de caída':'Ver posición')+'</span></button>').join(''):'<p>No se detectaron caídas grandes con este análisis breve. Eso no garantiza que todas las jugadas sean óptimas.</p>')+
+ '<div class="group">Todas las jugadas</div>'+moves.map(r=>'<button class="review-row '+r.tone+'" data-review-index="'+r.index+'"><span><span class="move-name">'+esc(reviewMoveLabel(r))+'</span>'+esc(r.category)+'</span><span class="review-score">'+scoreLabel(r.before)+' → '+scoreLabel(r.after)+'</span></button>').join('')+
+ '<p class="small">Criterios orientativos: estable &lt;0,4; imprecisión 0,4–0,99; error 1–2,49; error importante ≥2,5 peones de caída. Las líneas de mate se tratan por separado.</p>';
+ $('sheetBody').onclick=e=>{const target=e.target.closest('[data-review-index]');if(target)showReviewedPosition(report,Number(target.dataset.reviewIndex));};
+}
+function showReviewedPosition(report,index,view='before'){
+ const row=report.rows[index];if(!row)return;
+ const fen=view==='played'?row.afterFen:view==='best'&&row.suggestion?row.suggestion.fen:row.beforeFen;
+ const c=new Chess(fen),map=boardMap(c),move=view==='best'&&row.suggestion?row.suggestion:row.move;
+ let board='';
+ for(let rank=8;rank>=1;rank--)for(let file=0;file<8;file++){
+  const square=String.fromCharCode(97+file)+rank,p=map[square];
+  board+='<div class="sq '+((8-rank+file)%2?'dark':'')+((square===move.from||square===move.to)?' last':'')+'" aria-label="'+square+'">'+(p?pieceSVG(p):'')+'</div>';
+ }
+ $('sheetBody').innerHTML='<h3 class="review-summary-title">'+esc(reviewMoveLabel(row))+'</h3><p>'+esc(row.category)+(row.loss!==null?' · caída estimada: '+(row.loss/100).toFixed(1)+' peones':'')+'</p>'+
+ '<div class="review-tabs"><button data-position-view="before" class="'+(view==='before'?'active':'')+'">Antes</button><button data-position-view="played" class="'+(view==='played'?'active':'')+'">Jugada realizada</button>'+(row.suggestion?'<button data-position-view="best" class="'+(view==='best'?'active':'')+'">Alternativa '+esc(row.suggestion.san)+'</button>':'')+'</div>'+
+ '<div class="mini-board" role="img" aria-label="Posición de la jugada seleccionada">'+board+'</div><p>Evaluación de la jugada realizada, desde blancas: <strong>'+scoreLabel(row.before)+' → '+scoreLabel(row.after)+'</strong>.</p><p class="small">La alternativa es la preferida por el motor en su búsqueda breve. Esta vista no modifica tu partida.</p><div class="btnrow"><button id="prevReview" '+(index===0?'disabled':'')+'>← Anterior</button><button id="reviewOverview">Resumen</button><button id="nextReview" '+(index===report.rows.length-1?'disabled':'')+'>Siguiente →</button></div>';
+ $('sheetBody').onclick=e=>{const t=e.target.closest('[data-position-view]');if(t)showReviewedPosition(report,index,t.dataset.positionView);};
+ $('prevReview').onclick=()=>showReviewedPosition(report,index-1);$('nextReview').onclick=()=>showReviewedPosition(report,index+1);$('reviewOverview').onclick=()=>showReviewReport(report);
+}
+
 render();queueOpponent();
 
 $("boot").classList.add("hidden");

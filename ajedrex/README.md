@@ -4,9 +4,9 @@ Proyecto personal de hobby de **alexpueblag** para aprender ajedrez mediante pis
 
 ## Jugar
 
-Dirección prevista de GitHub Pages: https://alexpueblag.github.io/pizarron-claude-yodbot/ajedrex/
+Juega en GitHub Pages: https://alexpueblag.github.io/pizarron-claude-yodbot/ajedrex/
 
-La dirección solo estará disponible cuando GitHub Pages termine de publicar el commit. El enlace al repositorio muestra código, no ejecuta el tablero.
+El enlace al repositorio muestra el código; la dirección anterior abre el juego.
 
 En iPhone, abrir esa dirección en **Safari**. Tocar origen y destino o arrastrar una pieza. En **Partida**, elegir rival y dificultad. Usar **Compartir → Añadir a pantalla de inicio** para crear un acceso. La primera carga necesita internet; el indicador inferior confirma cuando el navegador terminó de preparar los archivos sin conexión. iOS puede eliminar datos de sitios por espacio o configuración.
 
@@ -16,9 +16,20 @@ En iPhone, abrir esa dirección en **Safari**. Tocar origen y destino o arrastra
 - GarboChess incluido localmente, cinco niveles de tiempo/profundidad; iniciación intercala jugadas aleatorias. No son niveles Elo certificados.
 - Respuesta del rival con al menos 900 ms de espera visible, animación de 220 ms, toque y arrastre.
 - Piezas SVG propias, sin depender de la fuente o los emojis del dispositivo.
+- Barra blanca y negra de ventaja, calculada por el motor en segundo plano; valor aproximado en unidades de peón desde blancas.
+- Capturas visibles junto a cada jugador, con dibujos, cantidades y balance del material que queda.
+- Evaluación final con evolución de la ventaja, momentos para aprender y posiciones/alternativas que puedes revisar sin cambiar la partida. También se puede abrir durante el juego; el rival se pausa mientras revisas.
 - 18 ayudas automáticas; catálogo de 81 fichas (75 temas de Lichess más seis ayudas propias).
 - Seis ejemplos, guardar en el navegador, exportar/importar JSON y copiar PGN.
 - Caché sin conexión mediante service worker, limitada a esta carpeta.
+
+## Cómo se interpreta la evaluación
+
+La parte blanca crece cuando el motor estima ventaja de blancas y la negra cuando favorece a negras. El signo siempre se refiere a blancas, incluso al girar el tablero. Si el motor no está disponible se indica expresamente que el dato es solo balance de material. El mate y las tablas prevalecen sobre esa estimación.
+
+El informe usa búsquedas breves de GarboChess por posición. Agrupa caídas aproximadas de evaluación en estable (<0,4 peones), imprecisión (0,4–0,99), error (1–2,49) y error importante (≥2,5); las líneas de mate se tratan por separado. No estima el Elo ni una precisión certificada. Una búsqueda corta puede no comprender un sacrificio o una combinación profunda. Cada alternativa se valida como jugada legal.
+
+Las capturas se cuentan desde el historial real, incluyendo captura al paso y piezas coronadas. Una posición de ejemplo sin historial no inventa capturas a partir de sus piezas ausentes. El balance de material se calcula del tablero actual, con valores convencionales de peón 1, caballo/alfil 3, torre 5 y dama 9.
 
 ## Lo que falta
 
@@ -54,7 +65,8 @@ La suite WebKit usa dimensiones y gestos de iPhone 13; no reemplaza la prueba en
 - index.html, styles.css, app.js: interfaz y estados de la partida.
 - tactics.js, catalog.js: detectores, explicaciones y ejemplos.
 - vendor/: motores/reglas y sus avisos de licencia.
-- engine-worker.js: cálculo fuera del hilo de la interfaz.
+- engine-worker.js: jugadas del rival fuera del hilo de la interfaz.
+- insights.js, review-worker.js: material, ventaja y revisión en un worker independiente.
 - sw.js, manifest.webmanifest, icon.svg: instalación web y caché.
 - tests/: reglas, regresiones, interacción simulada y WebKit.
 

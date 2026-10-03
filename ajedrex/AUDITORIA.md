@@ -1,4 +1,4 @@
-# Auditoría de Ajedrex v0.2
+# Auditoría de Ajedrex v0.3
 
 Fecha: 2026-10-03. Proyecto personal de hobby de alexpueblag.
 
@@ -18,11 +18,21 @@ El usuario informó que en iPhone veía texto sin el tablero y, cuando apareció
 8. **Web sin conexión:** scripts locales, worker por URL del mismo origen, manifiesto y precaché dentro de la carpeta del proyecto.
 9. **Accesibilidad:** restauración del foco al cerrar paneles, SVG explícitos, avisos con símbolos además de colores.
 
+## Ventaja, capturas y evaluación final (v0.3)
+
+- Barra de ventaja con evaluación de GarboChess, perspectiva blanca estable al girar el tablero, distinción visible entre motor y material, y prioridad del resultado reglamentario.
+- GarboChess usa un peón de 800 unidades internas: se divide entre 8 para expresar centipeones y se invierte el signo cuando corresponde jugar a negras. No se convierte este valor a Elo.
+- Worker independiente para la revisión; se cancela el análisis de posición al pensar el rival para no disputar el procesador del móvil. La revisión pausa al rival y cerrarla reanuda la partida.
+- Capturas por historial y balance por tablero, tratados por separado para cubrir captura al paso, promociones y posiciones de ejemplo.
+- Informe final con gráfico, clasificaciones orientativas, alternativas legales y navegación por posiciones sin mutar el juego.
+- Caché v0.3 incorpora ambos archivos nuevos y activa la actualización solo tras completar la precarga.
+
 ## Pruebas previas a subir
 
 - 60 comprobaciones de reglas/tácticas/motor: perft inicial 20/400/8902, seis ejemplos, regresión de descubierta, enroque por jaque, caducidad de captura al paso, promociones, mate, ahogado, repetición y 40 movimientos legales del motor.
-- 20 comprobaciones de interacción simulada: colores SVG, toques, espera mínima, cancelar respuestas obsoletas, deshacer, catálogo, búsqueda, ayudas, promoción, copias, recarga y recuperación de motor silencioso.
-- Suite WebKit/iPhone preparada para ejecutarse en GitHub Actions. Su resultado debe consultarse en el run del commit; preparar una prueba no implica que haya pasado.
+- 26 comprobaciones de interacción simulada: colores SVG, toques, espera mínima, cancelar respuestas obsoletas, deshacer, catálogo, búsqueda, ayudas, promoción, copias, recarga, recuperación de motor silencioso, capturas, deshacer, informe final y preservación de la partida durante la revisión.
+- 19 comprobaciones nuevas de material y revisión: capturas, captura al paso, promoción con captura, material en FEN, signo del motor, fallback, mate, tablas, alternativas legales y números de jugada desde FEN.
+- Suite de 11 recorridos reales de navegador en GitHub Actions: 10 WebKit/iPhone y 1 Chromium offline. Incluye capturas, giro, barra calculada, informe final, revisión sin mutación y reanudación del rival. El resultado definitivo corresponde al run del commit, no a la mera existencia de estas pruebas.
 
 ## Límites importantes
 

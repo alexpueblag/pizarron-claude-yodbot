@@ -44,3 +44,12 @@ test('Carga sin conexión después de preparar caché',async({page,context})=>{
  await page.locator('[data-square="e2"]').tap();await page.locator('[data-square="e4"]').tap();
  await expect.poll(()=>page.evaluate(()=>game.history().length)).toBe(2);
 });
+
+test('Publicación real en GitHub Pages',async({page})=>{
+ await page.goto('https://alexpueblag.github.io/pizarron-claude-yodbot/ajedrex/');
+ await expect(page.locator('#board [data-square]')).toHaveCount(64);
+ await expect(page.locator('#board svg[data-color="w"]')).toHaveCount(16);
+ await expect(page.locator('#board svg[data-color="b"]')).toHaveCount(16);
+ await page.locator('[data-square="e2"]').tap();await page.locator('[data-square="e4"]').tap();
+ await expect.poll(()=>page.evaluate(()=>game.history().length),{timeout:10000}).toBe(2);
+});

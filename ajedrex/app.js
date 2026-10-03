@@ -304,6 +304,11 @@ if(startupNotice){$('boot').textContent=startupNotice;$('boot').classList.remove
 if('serviceWorker' in navigator && location.protocol!=='file:'){
  navigator.serviceWorker.register('./sw.js').then(async()=>{
   await navigator.serviceWorker.ready;
+  if(!navigator.serviceWorker.controller)await new Promise((resolve,reject)=>{
+   const finish=()=>{if(navigator.serviceWorker.controller){clearTimeout(timer);navigator.serviceWorker.removeEventListener('controllerchange',finish);resolve();}};
+   const timer=setTimeout(()=>{navigator.serviceWorker.removeEventListener('controllerchange',finish);reject(Error('Sin controlador offline'));},8000);
+   navigator.serviceWorker.addEventListener('controllerchange',finish);finish();
+  });
   $('offlineNote').textContent='Lista para jugar sin conexión después de esta carga.';
  }).catch(()=>{$('offlineNote').textContent='No se pudo preparar el modo sin conexión. Puedes jugar mientras tengas esta página abierta.';});
 }else{$('offlineNote').textContent='Abre la dirección HTTPS en Safari para preparar el modo sin conexión.';}

@@ -12,7 +12,7 @@ function openNavigation(){
  ['backup','↓','Descargar copia','Conservar partida, preferencias y progreso']
  ];
  assistOpen('Tu espacio de ajedrez',
- '<p class="drawer-status">Tu partida queda pausada mientras usas este menú.</p>'+
+ '<p class="drawer-status">'+(typeof onlineIsPlaying==='function'&&onlineIsPlaying()?'En línea, abrir el menú no pausa la partida de tu amigo.':'Tu partida queda pausada mientras usas este menú.')+'</p>'+
  '<label for="menuSearch" class="small">Buscar una opción</label><input id="menuSearch" class="search" type="search" placeholder="Ayudas, nivel, prácticas…" autocomplete="off">'+
  '<div class="drawer-actions">'+actions.map(([id,icon,title,desc])=>'<button class="drawer-action" data-nav="'+id+'"><span aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+desc+'</small></span><span aria-hidden="true">›</span></button>').join('')+'</div><p id="menuEmpty" class="hidden" role="status">No hay opciones con ese nombre.</p>'+
  '<details class="drawer-settings" open><summary>Ajustes rápidos</summary>'+

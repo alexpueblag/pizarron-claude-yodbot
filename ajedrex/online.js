@@ -34,6 +34,7 @@ function onlinePaint(){
 function onlineErrorText(code){
  return ({NAME:'Escribe un nombre de hasta 60 caracteres.',AUTH:'Tu acceso ya no está activo. Pide una nueva invitación.',INVITE:'La invitación no es válida o caducó.',INVITE_USED:'La invitación ya se usó en otro navegador.',ROOM_FULL:'La sala ya tiene dos jugadores.',FORBIDDEN:'No tienes acceso a esa sala.',CONFLICT:'La partida cambió. Se está recuperando la posición del servidor.',TURN:'Es el turno del otro jugador.',ILLEGAL:'El servidor rechazó esa jugada.',SETUP:'Falta activar el servidor de Ajedrex.',OFFLINE:'Sin conexión. Se conserva el guardado pendiente.',TIMEOUT:'No llegó confirmación. Se conservará el intento para comprobarlo.',SIZE:'La partida supera el tamaño admitido. Exporta el JSON.',STATUS:'La sala todavía no está lista o ya terminó.'})[code]||'No se pudo completar. Conservamos tu partida.';
 }
+function onlineBridgeOrigin(origin){return /^https:\/\/(?:[a-z0-9-]+[-.]script|script)\.googleusercontent\.com$/.test(origin);}
 function onlineConnect(){
  if(onlineBridge)return Promise.resolve(onlineBridge);
  if(onlineConnecting)return onlineConnecting;
@@ -43,7 +44,7 @@ function onlineConnect(){
   const channel=onlineToken(),iframe=document.createElement('iframe');iframe.hidden=true;iframe.title='Conexión privada de partidas';iframe.referrerPolicy='no-referrer';iframe.src=endpoint+'?channel='+channel;
   const timer=setTimeout(()=>{window.removeEventListener('message',ready);iframe.remove();onlineConnecting=null;reject(Error('TIMEOUT'));},25000);
   function ready(e){
-   if(e.data?.channel!==channel||e.data?.kind!=='ready'||!/^https:\/\/[a-z0-9-]+\.script\.googleusercontent\.com$/.test(e.origin))return;
+   if(e.data?.channel!==channel||e.data?.kind!=='ready'||!onlineBridgeOrigin(e.origin))return;
    clearTimeout(timer);window.removeEventListener('message',ready);onlineBridge={source:e.source,origin:e.origin,channel,iframe};resolve(onlineBridge);
   }
   window.addEventListener('message',ready);document.body.appendChild(iframe);
@@ -80,7 +81,7 @@ function onlineApply(room){
  if(onlineRoom&&room.id===onlineRoom.id&&room.revision<=onlineRoom.revision)return;
  const c=new Chess(room.startFen);for(const m of room.moves||[])if(!c.move(m))throw Error('POSITION');
  if(c.fen()!==room.fen)throw Error('POSITION');
- if(!onlineRoom){onlinePrevious=backupData();cancelThinking();closeSheet();}
+ if(!onlineRoom){onlinePrevious=backupData();cancelThinking();onlineRoom=room;closeSheet();}
  onlineRoom=room;onlineState.roomId=room.id;onlinePersist();
  game=c;startFen=room.startFen;prefs.mode='local';prefs.flipped=onlineActor.id===room.b;
  if(!room.allowHints)prefs.enabled=[];selected=null;focusAlert=null;cache=null;busy=false;render();

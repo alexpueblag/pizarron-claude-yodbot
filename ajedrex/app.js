@@ -149,7 +149,7 @@ function renderBoardMode(){
  $('board').classList.toggle('playing',!boardInspect);
  if($('moveMode'))$('moveMode').setAttribute('aria-pressed',String(!boardInspect));
  if($('inspectMode'))$('inspectMode').setAttribute('aria-pressed',String(boardInspect));
- if($('boardModeHint'))$('boardModeHint').textContent=boardInspect?'Partida pausada. Toca una casilla o un símbolo para consultar sus ayudas.':'Toca o arrastra para mover. Los símbolos son indicadores; no abren ventanas.';
+ if($('boardModeHint'))$('boardModeHint').textContent=boardInspect?((typeof onlineIsPlaying==='function'&&onlineIsPlaying()?'Consultar no pausa a tu amigo. ':'Partida pausada. ')+'Toca una casilla o un símbolo para consultar sus ayudas.'):'Toca o arrastra para mover. Los símbolos son indicadores; no abren ventanas.';
 }
 
 function center(s){let[x,y]=xy(s);let col=prefs.flipped?7-x:x,row=prefs.flipped?y:7-y;return[(col+.5)*12.5,(row+.5)*12.5];}

@@ -1,5 +1,5 @@
 
-const CACHE='ajedrex-v0.8.0-'+self.registration.scope;
+const CACHE='ajedrex-v0.8.1-'+self.registration.scope;
 const FILES=['./','./index.html','./styles.css','./boot.js','./app.js','./assist.js','./navigation.js','./online.js','./online-config.json','./practice-data.js','./practice-model.js','./practice.js','./tactics.js','./catalog.js','./engine-worker.js','./review-worker.js','./insights.js','./theme-ui.js','./context-tactics.js','./advanced-tactics.js','./mate-patterns.js','./mate-search.js','./tactics-worker.js','./vendor/chess.js','./vendor/garbo.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('ajedrex-')&&k.endsWith(self.registration.scope)&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

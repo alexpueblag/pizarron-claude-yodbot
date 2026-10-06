@@ -16,7 +16,7 @@ test('Cola de guardado conserva el último estado y solo confirma con respuesta 
  await page.locator('[data-square="e2"]').tap();await page.locator('[data-square="e4"]').tap();
  await page.locator('[data-square="e7"]').tap();await page.locator('[data-square="e5"]').tap();
  await expect.poll(()=>page.evaluate(()=>onlineState.outbox[0]?.snapshot.moves.length)).toBe(2);
- await expect(page.locator('#onlineStatus')).toContainText('pendiente');
+ await expect(page.locator('#onlineStatus')).toContainText(/pendiente/i);
  await page.reload();expect(await page.evaluate(()=>onlineState.outbox[0].snapshot.moves.length)).toBe(2);
  await page.evaluate(async()=>{
   onlineConfig.endpoint='fixture';onlineRequest=async q=>({saved:true,revision:q.revision,id:'test'});
@@ -57,4 +57,17 @@ test('Una respuesta tardía no vuelve a abrir una sala que ya dejaste',async({pa
  await page.evaluate(()=>{onlineLeave();window.lateReply();});
  await expect.poll(()=>page.evaluate(()=>onlineIsPlaying())).toBe(false);
  expect(await page.evaluate(()=>game.fen())).toBe(fen);
+});
+
+test('El puente acepta los hosts de HtmlService y rechaza dominios parecidos',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(()=>[
+  onlineBridgeOrigin('https://n-example-0lu-script.googleusercontent.com'),
+  onlineBridgeOrigin('https://n-example.script.googleusercontent.com'),
+  onlineBridgeOrigin('https://script.googleusercontent.com'),
+  onlineBridgeOrigin('https://n-example-script.googleusercontent.com.evil.example'),
+  onlineBridgeOrigin('https://evil.example'),
+  onlineBridgeOrigin('http://n-example-script.googleusercontent.com')
+ ]);
+ expect(result).toEqual([true,true,true,false,false,false]);
 });

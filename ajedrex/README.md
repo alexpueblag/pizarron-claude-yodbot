@@ -100,3 +100,10 @@ La suite WebKit usa dimensiones y gestos de iPhone 13; no reemplaza la prueba en
 ## Licencias
 
 chess.js conserva su licencia BSD de dos cláusulas. GarboChess conserva su licencia BSD de tres cláusulas. Sus avisos están en el código y en THIRD_PARTY_NOTICES.txt. Las formas SVG de las piezas son originales para este proyecto; no se copian los recursos de chess.com. Los textos del catálogo están redactados en español a partir de los temas de Lichess, cuya fuente se cita en la aplicación. No se ha elegido una licencia general de redistribución para el código propio.
+
+
+## v0.6: chinches y exploración
+
+Botón 📌 Chinches para señalar problemas, conservar el tablero y compartir un reporte reproducible. Guardar localmente no envía nada a ChatGPT. El enlace GitHub abre un borrador que debes publicar; incluye descarga JSON para el contexto completo. Desde cada alerta, “Explorar paso a paso” muestra las casillas relacionadas y la línea legal disponible sin modificar la partida. El selector de enfoque reduce iconos sin apagar preferencias.
+
+Consulta [la auditoría y ruta hacia 5.5](RUTA-5.5.md) para peticiones cubiertas, límites y pendientes ordenados por impacto.

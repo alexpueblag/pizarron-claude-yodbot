@@ -3,6 +3,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const topicById=Object.fromEntries(CATALOG.map(t=>[t.id,t]));
 const pieceGlyph={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
 let trainingMetadata=null;
+let assistancePaused=false,reviewVisibleFen=null;
 let tacticWorker=null,tacticTimer=null,tacticWatchdog=null,tacticId=0,tacticRequested=null,nextTacticBudget=2600;
 let advancedState={key:'',alerts:[],status:'idle'};const tacticCache=new Map();
 const evaluationCache=new Map();let liveId=0,liveWorker=null,liveTimer=null,liveTimeout=null,liveRequested=null,reviewJob=0,reviewWorker=null,reviewTimeout=null,reviewPaused=false,lastReview=null;
@@ -87,13 +88,13 @@ function stopTacticalAnalysis(){
 function scheduleTacticalAnalysis(){
  const key=tacticalPositionKey();
  if(advancedState.key!==key)advancedState={key,alerts:[],status:'idle'};
- if(busy||reviewPaused||practicePaused||document.hidden||!prefs.enabled.length){if(tacticRequested)stopTacticalAnalysis();return;}
+ if(busy||reviewPaused||practicePaused||assistancePaused||document.hidden||!prefs.enabled.length){if(tacticRequested)stopTacticalAnalysis();return;}
  if(tacticCache.has(key)){advancedState=tacticCache.get(key);return;}
  if(tacticRequested===key)return;
  stopTacticalAnalysis();tacticRequested=key;const id=tacticId,budgetMs=nextTacticBudget;nextTacticBudget=2600;
  advancedState={key,alerts:[],status:'working'};
  tacticTimer=setTimeout(function begin(){
-  if(id!==tacticId||key!==tacticalPositionKey()||busy||reviewPaused||practicePaused)return;
+  if(id!==tacticId||key!==tacticalPositionKey()||busy||reviewPaused||practicePaused||assistancePaused)return;
   if(liveWorker){tacticTimer=setTimeout(begin,150);return;}
   const finishError=()=>{
    if(id!==tacticId)return;if(tacticWorker)tacticWorker.terminate();tacticWorker=null;
@@ -119,7 +120,7 @@ function scheduleTacticalAnalysis(){
 function renderTacticalStatus(){
  const text=!prefs.enabled.length?'Alertas apagadas':busy?'Las alertas se actualizarán después de la respuesta.':advancedState.status==='working'?'Buscando más tácticas…':advancedState.status==='error'?'Avisos básicos activos. No se completó el análisis avanzado.':advancedState.status==='limited'?'Análisis breve: puede haber otras combinaciones.':busy?'Las alertas se actualizarán después de la respuesta.':'Iconos para explorar la posición.';
  $('tacticalStatus').textContent=text;
- $('deeperTactics').disabled=busy||reviewPaused||practicePaused||!prefs.enabled.length||advancedState.status==='working';
+ $('deeperTactics').disabled=busy||reviewPaused||practicePaused||assistancePaused||!prefs.enabled.length||advancedState.status==='working';
 }
 function renderThemeSummary(alerts){
  const grouped=new Map();for(const a of alerts){if(!grouped.has(a.type))grouped.set(a.type,[]);grouped.get(a.type).push(a);}
@@ -133,6 +134,7 @@ function inspectAlert(alert){
  '<p class="small">'+esc(THEME_META[alert.type]?.scope||'')+'</p><div class="btnrow"><button id="showAlertBoard" class="primary">'+(alert.move?'Ver jugada '+esc(alert.move.san||alert.move.from+'–'+alert.move.to):'Ver en el tablero')+'</button><button id="hideAlertType">Apagar esta ayuda</button></div>');
  $('showAlertBoard').onclick=()=>{closeSheet();focusAlert=alert;if(alert.move)selected=alert.move.from;render();};
  $('hideAlertType').onclick=()=>{toggleTheme(alert.type,false);closeSheet();};
+ if(typeof addAlertTools==='function')addAlertTools(alert);
  if(PRACTICE_LESSONS.some(l=>l.id===alert.type)){const button=document.createElement('button');button.id='practiceAlert';button.className='practice-return';button.textContent='Practicar esta táctica';button.onclick=()=>openPractice(alert.type);$('sheetBody').appendChild(button);}
 }
 
@@ -147,7 +149,7 @@ function statusText(){
  return (game.turn()==='w'?'Blancas':'Negras')+' · '+(game.in_check()?'en jaque':prefs.mode==='ai'&&game.turn()===prefs.human?'tu turno':'su turno');
 }
 function render(){
- const a=analysis(),alerts=visibleAlerts(),history=game.history({verbose:true}),last=history[history.length-1];
+ const a=analysis(),alerts=typeof focusAlerts==='function'?focusAlerts(visibleAlerts()):visibleAlerts(),history=game.history({verbose:true}),last=history[history.length-1];
  if(focusAlert&&!alerts.some(x=>JSON.stringify(x)===JSON.stringify(focusAlert)))focusAlert=null;
  const priority={mate:0,check:1,doubleCheck:1,mateIn1:2,mateIn2:2,mateIn3:2,mateIn4:2,mateIn5:2,pin:3,skewer:4,xRayAttack:5,fork:6,attacked:7,undefended:18,defended:20};
  const sorted=[...alerts].sort((a,b)=>(priority[a.type]??12)-(priority[b.type]??12));
@@ -206,7 +208,7 @@ function openSheet(title,html){
  $('sheetTitle').textContent=title;$('sheetBody').innerHTML=html;$('veil').classList.add('open');$('veil').setAttribute('aria-hidden','false');
  document.body.style.overflow='hidden';$('closeSheet').focus();
 }
-function closeSheet(){ $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();scheduleTacticalAnalysis();}finishPractice();if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
+function closeSheet(){ if(assistancePaused)return; $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();scheduleTacticalAnalysis();}finishPractice();if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
 function toggleTheme(id,on){if(!ACTIVE_THEMES.includes(id))return;if(on){if(!prefs.enabled.includes(id))prefs.enabled.push(id);}else prefs.enabled=prefs.enabled.filter(x=>x!==id);focusAlert=null;save();render();}
 
 function openHelps(){
@@ -246,9 +248,9 @@ function showAlerts(filter={}){
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
 function cancelThinking(){stopTacticalAnalysis();cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
+function makeMove(m){if(assistancePaused)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
- if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused)return;
+ if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused||assistancePaused)return;
  stopTacticalAnalysis();cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
  const lv=Number(prefs.level),config=[null,{ms:70,depth:1},{ms:150,depth:2},{ms:400,depth:4},{ms:850,depth:6},{ms:1400,depth:10}][lv];
  function finish(result){
@@ -279,7 +281,7 @@ function queueOpponent(){
 function tapSquare(s,isBadge){
  const alerts=visibleAlerts();
  if(isBadge){const candidates=alerts.filter(a=>a.squares[0]===s);if(candidates.length){const index=focusAlert?candidates.findIndex(a=>JSON.stringify(a)===JSON.stringify(focusAlert)):-1;focusAlert=candidates[(index+1)%candidates.length];render();return;}}
- if(busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human))return;
+ if(assistancePaused||busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human))return;
  if(selected){
   const choices=analysis().legal.filter(m=>m.from===selected&&m.to===s);
   if(choices.length){
@@ -323,7 +325,7 @@ function openSettings(){
  $('about').onclick=openAbout;
 }
 function openAbout(){
- openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.5</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
+ openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.6</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
 }
 function openLessons(){openPracticeGallery();}
@@ -393,10 +395,10 @@ function cancelLiveEvaluation(){
  liveTimer=null;liveTimeout=null;liveRequested=null;
 }
 function scheduleLiveEvaluation(){
- const fen=game.fen();if(game.game_over()||busy||reviewPaused||practicePaused||document.hidden||liveRequested===fen||evaluationCache.has(fen))return;
+ const fen=game.fen();if(game.game_over()||busy||reviewPaused||practicePaused||assistancePaused||document.hidden||liveRequested===fen||evaluationCache.has(fen))return;
  cancelLiveEvaluation();liveRequested=fen;const id=liveId;
  liveTimer=setTimeout(()=>{
-  if(id!==liveId||game.fen()!==fen||busy||reviewPaused||practicePaused)return;
+  if(id!==liveId||game.fen()!==fen||busy||reviewPaused||practicePaused||assistancePaused)return;
   const finish=score=>{
    if(id!==liveId||game.fen()!==fen)return;
    if(liveWorker)liveWorker.terminate();liveWorker=null;if(liveTimeout)clearTimeout(liveTimeout);
@@ -432,6 +434,7 @@ function stopReviewAnalysis(){
 }
 function reviewKey(){return startFen+'|'+game.history().join(' ');}
 function openGameReview(){
+ reviewVisibleFen=null;
  const key=reviewKey(),moves=game.history({verbose:true}).map(m=>({from:m.from,to:m.to,promotion:m.promotion}));
  cancelThinking();cancelLiveEvaluation();stopReviewAnalysis();reviewPaused=true;
  openSheet(game.game_over()?'Evaluación final':'Revisión de la partida','<div class="review-progress"><strong id="reviewStatus">Analizando las jugadas…</strong><progress id="reviewProgress" value="0" max="'+Math.max(1,moves.length)+'"></progress><p class="small">Puedes cerrar este panel para detener el análisis. Tu partida se conserva.</p></div><div id="reviewContent"></div>');
@@ -483,7 +486,7 @@ function showReviewReport(report){
 function showReviewedPosition(report,index,view='before'){
  const row=report.rows[index];if(!row)return;
  const fen=view==='played'?row.afterFen:view==='best'&&row.suggestion?row.suggestion.fen:row.beforeFen;
- const c=new Chess(fen),map=boardMap(c),move=view==='best'&&row.suggestion?row.suggestion:row.move;
+ reviewVisibleFen=fen;const c=new Chess(fen),map=boardMap(c),move=view==='best'&&row.suggestion?row.suggestion:row.move;
  let board='';
  for(let rank=8;rank>=1;rank--)for(let file=0;file<8;file++){
   const square=String.fromCharCode(97+file)+rank,p=map[square];

@@ -2,7 +2,7 @@ const {test,expect}=require('@playwright/test');
 async function local(page){await page.evaluate(()=>{cancelThinking();prefs.mode='local';render();});}
 async function corner(page,square){
  const badge=page.locator('#board [data-alert-square="'+square+'"]').first();
- await expect(badge).toBeVisible();await badge.scrollIntoViewIfNeeded();
+ await page.locator('#board').scrollIntoViewIfNeeded();await expect(badge).toBeVisible();
  const r=await badge.boundingBox();await page.touchscreen.tap(r.x+r.width/2,r.y+r.height/2);
 }
 test('Tocar encima del icono selecciona y captura, sin abrir una leyenda',async({page})=>{
@@ -59,4 +59,16 @@ test('Menú y consulta pausan la IA; volver a Jugar reanuda',async({page})=>{
  await page.locator('#menuInteraction').selectOption('inspect');await page.locator('[data-nav="resume"]').tap();
  await page.waitForTimeout(1200);expect(await page.evaluate(()=>game.history().length)).toBe(n);
  await page.locator('#moveMode').tap();await expect.poll(()=>page.evaluate(()=>game.history().length)).toBe(2);
+});
+
+test('La revisión automática no interrumpe el menú al terminar',async({page})=>{
+ await page.goto('/');
+ await page.evaluate(()=>{
+  cancelThinking();prefs.mode='local';game=new Chess('6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1');startFen=game.fen();cache=null;
+  makeMove({from:'e1',to:'e8'});openNavigation();
+ });
+ await page.waitForTimeout(900);
+ await expect(page.locator('#assistOverlay')).toHaveClass(/drawer-mode/);
+ expect(await page.evaluate(()=>reviewPaused)).toBe(false);
+ await page.locator('[data-nav="review"]').tap();await expect(page.locator('#sheetTitle')).toHaveText('Evaluación final');
 });

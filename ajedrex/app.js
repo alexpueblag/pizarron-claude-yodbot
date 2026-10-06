@@ -264,7 +264,7 @@ function showAlerts(filter={}){
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
 function cancelThinking(){stopTacticalAnalysis();cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){if(assistancePaused||boardInspect)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
+function makeMove(m){if(assistancePaused||boardInspect)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!assistancePaused&&!boardInspect&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
  if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused||assistancePaused||boardInspect)return;
  stopTacticalAnalysis();cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();

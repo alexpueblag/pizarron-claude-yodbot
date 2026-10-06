@@ -67,6 +67,7 @@ test('Migración activa todas una vez; cambios e importación conservan las pref
 test('Iconos de casilla abren su alerta exacta; el contador muestra las restantes',async({page})=>{
  await page.goto('/');await localPosition(page,'4k3/4n3/8/8/8/8/8/K3R3 b - - 0 1');
  await completedAnalysis(page);
+ await page.locator('#inspectMode').tap();
  const fen=await page.evaluate(()=>game.fen()),history=await page.evaluate(()=>game.history());
  const badge=page.locator('#board .badge[data-alert-type][data-alert-square]').first();
  await expect(badge).toBeVisible();

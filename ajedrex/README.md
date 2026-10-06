@@ -107,3 +107,10 @@ chess.js conserva su licencia BSD de dos cláusulas. GarboChess conserva su lice
 Botón 📌 Chinches para señalar problemas, conservar el tablero y compartir un reporte reproducible. Guardar localmente no envía nada a ChatGPT. El enlace GitHub abre un borrador que debes publicar; incluye descarga JSON para el contexto completo. Desde cada alerta, “Explorar paso a paso” muestra las casillas relacionadas y la línea legal disponible sin modificar la partida. El selector de enfoque reduce iconos sin apagar preferencias.
 
 Consulta [la auditoría y ruta hacia 5.5](RUTA-5.5.md) para peticiones cubiertas, límites y pendientes ordenados por impacto.
+
+
+## v0.7: menú lateral y toques sin confusión
+
+Menú abre un panel lateral con búsqueda, acceso a todas las secciones y ajustes rápidos. Se puede cerrar con X, Escape o tocando fuera; el rival espera mientras está abierto.
+
+El tablero comienza en **Jugar**: los iconos son visibles pero dejan pasar el toque a la casilla, incluida su esquina, para seleccionar, mover y arrastrar. **Consultar alertas** pausa la partida y convierte el toque en consulta, sin mover piezas; toca Jugar para continuar. Las 81 preferencias se conservan. El modo de consulta no persiste tras recargar, para evitar dejar la partida pausada sin querer.

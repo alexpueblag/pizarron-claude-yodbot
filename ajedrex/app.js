@@ -3,7 +3,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const topicById=Object.fromEntries(CATALOG.map(t=>[t.id,t]));
 const pieceGlyph={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
 let trainingMetadata=null;
-let assistancePaused=false,reviewVisibleFen=null;
+let assistancePaused=false,reviewVisibleFen=null,boardInspect=false;
 let tacticWorker=null,tacticTimer=null,tacticWatchdog=null,tacticId=0,tacticRequested=null,nextTacticBudget=2600;
 let advancedState={key:'',alerts:[],status:'idle'};const tacticCache=new Map();
 const evaluationCache=new Map();let liveId=0,liveWorker=null,liveTimer=null,liveTimeout=null,liveRequested=null,reviewJob=0,reviewWorker=null,reviewTimeout=null,reviewPaused=false,lastReview=null;
@@ -138,8 +138,23 @@ function inspectAlert(alert){
  if(PRACTICE_LESSONS.some(l=>l.id===alert.type)){const button=document.createElement('button');button.id='practiceAlert';button.className='practice-return';button.textContent='Practicar esta táctica';button.onclick=()=>openPractice(alert.type);$('sheetBody').appendChild(button);}
 }
 
+
+function setBoardMode(inspect){
+ boardInspect=Boolean(inspect);removeDrag();suppressClickUntil=0;selected=null;focusAlert=null;
+ if(boardInspect)cancelThinking();
+ render();if(!boardInspect)queueOpponent();
+}
+function renderBoardMode(){
+ $('board').classList.toggle('consulting',boardInspect);
+ $('board').classList.toggle('playing',!boardInspect);
+ if($('moveMode'))$('moveMode').setAttribute('aria-pressed',String(!boardInspect));
+ if($('inspectMode'))$('inspectMode').setAttribute('aria-pressed',String(boardInspect));
+ if($('boardModeHint'))$('boardModeHint').textContent=boardInspect?'Partida pausada. Toca una casilla o un símbolo para consultar sus ayudas.':'Toca o arrastra para mover. Los símbolos son indicadores; no abren ventanas.';
+}
+
 function center(s){let[x,y]=xy(s);let col=prefs.flipped?7-x:x,row=prefs.flipped?y:7-y;return[(col+.5)*12.5,(row+.5)*12.5];}
 function statusText(){
+ if(boardInspect)return 'Consultar alertas · partida pausada';
  if(game.in_checkmate())return 'Jaque mate · ganan '+(game.turn()==='w'?'negras':'blancas');
  if(game.in_stalemate())return 'Tablas por ahogado';
  if(game.in_threefold_repetition())return 'Tablas por repetición';
@@ -149,6 +164,7 @@ function statusText(){
  return (game.turn()==='w'?'Blancas':'Negras')+' · '+(game.in_check()?'en jaque':prefs.mode==='ai'&&game.turn()===prefs.human?'tu turno':'su turno');
 }
 function render(){
+ renderBoardMode();
  const a=analysis(),alerts=typeof focusAlerts==='function'?focusAlerts(visibleAlerts()):visibleAlerts(),history=game.history({verbose:true}),last=history[history.length-1];
  if(focusAlert&&!alerts.some(x=>JSON.stringify(x)===JSON.stringify(focusAlert)))focusAlert=null;
  const priority={mate:0,check:1,doubleCheck:1,mateIn1:2,mateIn2:2,mateIn3:2,mateIn4:2,mateIn5:2,pin:3,skewer:4,xRayAttack:5,fork:6,attacked:7,undefended:18,defended:20};
@@ -161,8 +177,8 @@ function render(){
   const cls=['sq',(row+col)%2?'dark':'',selected===s?'selected':'',last&&(last.from===s||last.to===s)?'last':'',target?'target':'',target&&p?'capture':''].filter(Boolean).join(' ');
   const label=s+(p?' '+PIECE_NAMES[p.type]+' '+(p.color==='w'?'blanco':'negro'):' vacía')+(badges.length?', avisos: '+badges.map(b=>topicById[b.type].name).join(', '):'');
   html+='<div class="square-wrap"><button class="'+cls+'" data-square="'+s+'" aria-label="'+esc(label)+'" aria-pressed="'+(selected===s)+'">'+(p?pieceSVG(p):'')+(col===0?'<span class="coord rank">'+rank+'</span>':'')+(row===7?'<span class="coord file">'+s[0]+'</span>':'')+'</button>'+
-   badges.slice(0,2).map((badge,i)=>'<button class="badge '+badge.type+' badge-slot-'+i+(badge.confidence==='candidate'?' candidate':'')+'" data-alert-square="'+s+'" data-alert-type="'+badge.type+'" aria-label="'+esc(topicById[badge.type].name)+' en '+s+'" title="'+esc(topicById[badge.type].name)+'">'+themeIcon(badge.type)+'</button>').join('')+
-   (badges.length>2?'<button class="badge badge-more" data-alert-square="'+s+'" data-alert-more="'+s+'" aria-label="Ver las '+badges.length+' ayudas de '+s+'">+'+(badges.length-2)+'</button>':'')+'</div>';
+   badges.slice(0,2).map((badge,i)=>'<button class="badge '+badge.type+' badge-slot-'+i+(badge.confidence==='candidate'?' candidate':'')+'" tabindex="'+(boardInspect?'0':'-1')+'" aria-hidden="'+(!boardInspect)+'" data-alert-square="'+s+'" data-alert-type="'+badge.type+'" aria-label="'+esc(topicById[badge.type].name)+' en '+s+'" title="'+esc(topicById[badge.type].name)+'">'+themeIcon(badge.type)+'</button>').join('')+
+   (badges.length>2?'<button class="badge badge-more" tabindex="'+(boardInspect?'0':'-1')+'" aria-hidden="'+(!boardInspect)+'" data-alert-square="'+s+'" data-alert-more="'+s+'" aria-label="Ver las '+badges.length+' ayudas de '+s+'">+'+(badges.length-2)+'</button>':'')+'</div>';
  }
  $('board').innerHTML=html;
  let lines=[];
@@ -194,7 +210,7 @@ function render(){
   if($('showMove'))$('showMove').onclick=()=>{selected=current.move.from;render();};
  }else{
   $('hintTitle').textContent=selected?'Elige una casilla marcada':game.game_over()?'Partida terminada':'Aprende mientras juegas';
-  $('hintText').textContent=selected?'Los puntos indican movimientos legales. Toca un símbolo para entender su aviso.':game.game_over()?statusText()+'. Puedes deshacer o comenzar otra partida.':alerts.length?'Toca los símbolos del tablero o «Ver avisos» para descubrir qué está pasando.':'Toca una pieza y después su destino. Activa las pistas que quieras desde Ayudas.';
+  $('hintText').textContent=selected?'Los puntos indican movimientos legales. Toca un símbolo para entender su aviso.':game.game_over()?statusText()+'. Puedes deshacer o comenzar otra partida.':alerts.length?'Para entender los símbolos, elige «Consultar alertas» o «Ver avisos». En Jugar, toda la casilla sirve para mover.':'Toca una pieza y después su destino. Activa las pistas que quieras desde Ayudas.';
   $('hintAction').innerHTML='';
  }
  $('storageNote').textContent=storageOK?'Guardado en este navegador. Exporta una copia desde Partida para conservarla.':'Esta vista no permite guardar automáticamente. Conserva tu partida copiando el PGN.';
@@ -242,15 +258,15 @@ function openCatalog(){
 }
 function showAlerts(filter={}){
  if(!filter||(!filter.square&&!topicById[filter.type]))filter={};
- const alerts=visibleAlerts().filter(a=>(!filter.square||a.squares?.[0]===filter.square)&&(!filter.type||a.type===filter.type));
+ const alerts=visibleAlerts().filter(a=>(!filter.square||(filter.related?a.squares?.includes(filter.square):a.squares?.[0]===filter.square))&&(!filter.type||a.type===filter.type));
  openSheet(filter.square?'Ayudas en '+filter.square:filter.type?topicById[filter.type].name:'Avisos de la posición',alerts.length?'<p>Toca una ayuda para ver su explicación y, si corresponde, una jugada.</p>'+alerts.map((a,i)=>'<button class="lesson alert-row" data-choose-alert="'+i+'"><span class="help-icon">'+themeIcon(a.type)+'</span><span><strong>'+esc(topicById[a.type].name)+(a.squares?.[0]?' · '+esc(a.squares[0]):'')+'</strong><span class="chip">'+confidenceLabel(a)+'</span><span class="small">'+esc(a.message)+'</span></span></button>').join(''):'<p>No hay avisos de los tipos activados para esta posición.</p><button id="enableHelps">Configurar ayudas</button>');
  $('sheetBody').onclick=e=>{const b=e.target.closest('[data-choose-alert]');if(b)inspectAlert(alerts[Number(b.dataset.chooseAlert)]);};
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
 function cancelThinking(){stopTacticalAnalysis();cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){if(assistancePaused)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
+function makeMove(m){if(assistancePaused||boardInspect)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
- if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused||assistancePaused)return;
+ if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused||assistancePaused||boardInspect)return;
  stopTacticalAnalysis();cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
  const lv=Number(prefs.level),config=[null,{ms:70,depth:1},{ms:150,depth:2},{ms:400,depth:4},{ms:850,depth:6},{ms:1400,depth:10}][lv];
  function finish(result){
@@ -279,6 +295,7 @@ function queueOpponent(){
  }catch(e){fallback();}
 }
 function tapSquare(s,isBadge){
+ if(boardInspect){showAlerts({square:s,related:true});return;}
  const alerts=visibleAlerts();
  if(isBadge){const candidates=alerts.filter(a=>a.squares[0]===s);if(candidates.length){const index=focusAlert?candidates.findIndex(a=>JSON.stringify(a)===JSON.stringify(focusAlert)):-1;focusAlert=candidates[(index+1)%candidates.length];render();return;}}
  if(assistancePaused||busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human))return;
@@ -325,7 +342,7 @@ function openSettings(){
  $('about').onclick=openAbout;
 }
 function openAbout(){
- openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.6</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
+ openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.7</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
 }
 function openLessons(){openPracticeGallery();}
@@ -338,7 +355,7 @@ function dropSquare(x,y){
  return String.fromCharCode(97+(prefs.flipped?7-col:col))+(prefs.flipped?row+1:8-row);
 }
 $('board').onpointerdown=e=>{
- if(busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human)||e.button>0||e.target.closest('[data-alert-square]'))return;
+ if(boardInspect||assistancePaused||busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human)||e.button>0||e.target.closest('[data-alert-square]'))return;
  const button=e.target.closest('[data-square]');if(!button)return;const from=button.dataset.square,p=game.get(from);if(!p||p.color!==game.turn())return;
  drag={from,p,id:e.pointerId,x:e.clientX,y:e.clientY,active:false,ghost:null};
  };
@@ -356,13 +373,14 @@ $('board').onpointerup=e=>{
  if(moved){suppressClickUntil=Date.now()+500;selected=from;if(to)tapSquare(to,false);else{selected=null;render();}e.preventDefault();}
 };
 $('board').onpointercancel=()=>{removeDrag();selected=null;render();};
-$('board').onclick=e=>{if(Date.now()<suppressClickUntil)return;const more=e.target.closest('[data-alert-more]');if(more){showAlerts({square:more.dataset.alertMore});return;}const badge=e.target.closest('[data-alert-type]');if(badge){inspectAlert(visibleAlerts().find(a=>a.type===badge.dataset.alertType&&a.squares?.[0]===badge.dataset.alertSquare));return;}const b=e.target.closest('[data-square]');if(b)tapSquare(b.dataset.square,false);};
+$('board').onclick=e=>{if(assistancePaused||Date.now()<suppressClickUntil)return;
+ if(!boardInspect){const square=e.target.closest('[data-square],[data-alert-square]');if(square)tapSquare(square.dataset.square||square.dataset.alertSquare,false);return;}const more=e.target.closest('[data-alert-more]');if(more){showAlerts({square:more.dataset.alertMore});return;}const badge=e.target.closest('[data-alert-type]');if(badge){inspectAlert(visibleAlerts().find(a=>a.type===badge.dataset.alertType&&a.squares?.[0]===badge.dataset.alertSquare));return;}const b=e.target.closest('[data-square]');if(b)tapSquare(b.dataset.square,false);};
 $('deeperTactics').onclick=()=>{const key=tacticalPositionKey();stopTacticalAnalysis();tacticCache.delete(key);advancedState={key,alerts:[],status:'idle'};nextTacticBudget=10000;scheduleTacticalAnalysis();renderTacticalStatus();};
 $('activeThemes').onclick=e=>{const b=e.target.closest('[data-active-theme]');if(b)showAlerts({type:b.dataset.activeTheme});};
 
 $('finalReview').onclick=openGameReview;$('reviewButton').onclick=openGameReview;
 $('undo').onclick=undoMove;$('helpButton').onclick=openHelps;$('settingsButton').onclick=openSettings;
-$('seeAlerts').onclick=showAlerts;$('learnButton').onclick=openLessons;$('catalogButton').onclick=openCatalog;$('playButton').onclick=()=>{selected=null;focusAlert=null;render();};
+$('seeAlerts').onclick=showAlerts;$('learnButton').onclick=openLessons;$('catalogButton').onclick=openCatalog;$('playButton').onclick=()=>setBoardMode(false);
 $('closeSheet').onclick=closeSheet;$('veil').onclick=e=>{if(e.target===$('veil'))closeSheet();};
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape')closeSheet();

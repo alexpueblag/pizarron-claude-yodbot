@@ -38,3 +38,26 @@
 .sheetbody{padding-bottom:80px}
 
 .assist-mark:after{content:"📌";position:absolute;right:1px;top:1px;font-size:14px;z-index:4}
+
+/* v0.7: a whole square is a move target; icons receive input only in Consultar. */
+.board.playing .badge{pointer-events:none}
+.board.consulting{outline:3px solid #986bb5;outline-offset:3px}
+.board.consulting .sq{cursor:help}
+.board-modes{display:flex;gap:6px;padding:4px;background:#e4ece6;border-radius:14px;margin:8px 0}
+.board-modes button{flex:1;min-height:44px;padding:9px 5px;background:transparent;border:0;border-radius:10px;font-size:14px;font-weight:700;color:#31564b}
+.board-modes button[aria-pressed="true"]{background:#176d64;color:#fff;box-shadow:0 2px 5px #193c2920}
+.board-modes #inspectMode[aria-pressed="true"]{background:#72518c}
+.board-mode-hint{font-size:12px;line-height:1.45;min-height:35px;margin:6px 0 10px;color:#426055}
+.menu-trigger{min-height:44px;min-width:64px;border:1px solid #cadacf;border-radius:12px;background:#fffdf6;font-weight:700;color:#176d64;padding:9px}
+.top{gap:10px}.top .brand{font-size:clamp(23px,7vw,32px)}.top .version{white-space:nowrap;font-size:11px}
+.assist-overlay.drawer-mode{align-items:stretch;justify-content:flex-start;padding:0}
+.drawer-mode .assist-dialog{width:min(88vw,370px);height:100dvh;max-height:100dvh;border-radius:0 20px 20px 0;padding:calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));animation:drawer-in .18s ease-out}
+.drawer-mode .sheethead{position:sticky;top:-16px;background:#faf8f1;z-index:2;padding-bottom:10px}
+.drawer-status{font-size:13px;color:#496356}.drawer-actions{display:grid;gap:7px;margin:12px 0}
+.drawer-action{display:grid;grid-template-columns:28px 1fr 12px;gap:8px;align-items:center;text-align:left;background:white;border:1px solid #dce5dc;border-radius:12px;padding:12px 10px;min-height:58px;color:#21463c}
+.drawer-action[hidden]{display:none}.drawer-action strong{display:block;font-size:14px}.drawer-action small{display:block;font-size:12px;line-height:1.4;color:#607268;margin-top:4px}
+.drawer-action:hover,.drawer-action:focus-visible{background:#e9f2ea;border-color:#176d64}
+.drawer-settings{border-top:1px solid #d5ded4;padding:14px 0}.drawer-settings summary{font-weight:700;cursor:pointer;min-height:32px}
+.drawer-control{display:block;font-size:13px;margin:12px 0 4px}.drawer-check{display:flex;align-items:center;gap:10px;min-height:48px;font-size:14px}.drawer-check input{width:22px;height:22px;accent-color:#176d64}
+@keyframes drawer-in{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){.drawer-mode .assist-dialog{animation:none}}

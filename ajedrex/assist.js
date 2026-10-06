@@ -18,13 +18,14 @@ function assistPause(){
  if(!assistancePaused){assistReturnFocus=document.activeElement;assistancePaused=true;cancelThinking();}
 }
 function assistOpen(title,html){
- assistPause();$('assistTitle').textContent=title;$('assistBody').innerHTML=html;
+ $('assistOverlay').classList.remove('drawer-mode');$('assistClose').setAttribute('aria-label','Cerrar panel');
+ assistPause();$('assistBody').onclick=null;$('assistTitle').textContent=title;$('assistBody').innerHTML=html;
  $('assistOverlay').classList.remove('hidden');document.querySelector('main').inert=true;$('veil').inert=true;
  document.body.style.overflow='hidden';$('assistClose').focus();
 }
 function assistClose(){
  pinArmed=false;assistSession=null;document.body.classList.remove('pin-armed');
- $('pinButton').textContent='📌 Chinches';$('assistOverlay').classList.add('hidden');
+ $('pinButton').textContent='📌 Chinches';$('assistOverlay').classList.add('hidden');$('assistOverlay').classList.remove('drawer-mode');$('menuButton').setAttribute('aria-expanded','false');
  document.querySelector('main').inert=false;$('veil').inert=false;
  document.body.style.overflow=$('veil').classList.contains('open')?'hidden':'';
  assistancePaused=false;
@@ -33,7 +34,7 @@ function assistClose(){
 }
 function pinCapture(alert){
  const c=practiceSession?.chess||(reviewPaused&&reviewVisibleFen?new Chess(reviewVisibleFen):game);
- return {appVersion:'0.6',createdAt:new Date().toISOString(),fen:c.fen(),
+ return {appVersion:'0.7',createdAt:new Date().toISOString(),fen:c.fen(),
   context:practiceSession?'practice':reviewPaused?'review':'game',
   lesson:practiceSession?.lesson?.id||null,
   backup:backupData(),pgn:c.pgn(),flipped:prefs.flipped,

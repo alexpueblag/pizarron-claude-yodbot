@@ -469,7 +469,7 @@ function reviewChart(report){
 }
 function reviewMoveLabel(row){return (row.fullmove||Math.floor(row.index/2)+1)+(row.move.color==='w'?'. ':'… ')+row.move.san;}
 function showReviewReport(report){
- if(!reviewPaused)return;
+ if(!reviewPaused)return;reviewVisibleFen=null;
  const terminal=report.final,whiteErrors=report.rows.filter(r=>r.move.color==='w'&&r.tone==='bad').length,blackErrors=report.rows.filter(r=>r.move.color==='b'&&r.tone==='bad').length;
  let title=terminal?scoreLabel(terminal)+' · '+(terminal.kind==='draw'?'Tablas':terminal.winner==='w'?'Ganan blancas':'Ganan negras'):'Partida en curso';
  const dropped=report.rows.filter(r=>r.tone==='bad'||r.tone==='notice').sort((a,b)=>(b.loss??10000)-(a.loss??10000)).slice(0,3);

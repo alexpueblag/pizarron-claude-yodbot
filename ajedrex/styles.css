@@ -31,8 +31,10 @@
 .app{padding-bottom:90px}.assist-overlay{position:fixed;inset:0;z-index:90;background:#102b28a8;display:flex;align-items:flex-end;justify-content:center;padding-top:env(safe-area-inset-top)}
 .assist-overlay.hidden{display:none}.assist-dialog{background:#faf8f1;color:#193b34;width:min(100%,620px);max-height:92dvh;overflow:auto;overscroll-behavior:contain;border-radius:20px 20px 0 0;padding:18px 18px calc(24px + env(safe-area-inset-bottom));box-sizing:border-box}
 .assist-dialog .btnrow{flex-wrap:wrap}.assist-dialog textarea{box-sizing:border-box;width:100%;font-size:16px}.assist-dialog a{color:#12645b;text-decoration:underline}
-.assist-boardwrap{position:relative;max-width:400px;margin:auto}.assist-boardwrap .mini-board{width:100%;margin:0;box-sizing:border-box}.assist-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.assist-boardwrap{position:relative;max-width:400px;margin:auto}.assist-boardwrap .mini-board{width:100%;max-width:none;margin:0;box-sizing:border-box}.assist-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .assist-mark{box-shadow:inset 0 0 0 4px #cc710e}.assist-coordinate{position:absolute;bottom:1px;left:2px;font-size:10px;color:#12342d;background:#fff9;border-radius:2px}
 .pin-row{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;margin:8px 0;padding:12px}.pin-row span{font-size:12px}.pin-armed *{cursor:crosshair!important}.pin-armed .board{outline:4px dashed #d58a2b;outline-offset:3px}
 
 .sheetbody{padding-bottom:80px}
+
+.assist-mark:after{content:"📌";position:absolute;right:1px;top:1px;font-size:14px;z-index:4}

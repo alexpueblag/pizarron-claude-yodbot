@@ -73,7 +73,7 @@ function pinCompose(target){
 }
 function pinText(r,compact=false){
  const s=r.snapshot;
- return '# Ajedrex · '+r.id+'\n\n'+r.comment+'\n\n'+
+ return '# Ajedrex · '+r.id+'\n\n'+(compact?r.comment.slice(0,400)+(r.comment.length>400?'… (comentario completo en JSON)':''):r.comment)+'\n\n'+
  'Versión: '+s.appVersion+'\nPantalla: '+s.context+' · '+s.screenTitle+'\nElemento: '+(r.target.square||r.target.label||'General')+
  '\nFEN visible: '+s.fen+'\nTema: '+(s.alert?.type||r.target.theme||'ninguno')+
  '\nLección: '+(s.lesson||'ninguna')+'\nTamaño: '+s.viewport.width+' × '+s.viewport.height+

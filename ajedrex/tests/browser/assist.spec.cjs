@@ -28,7 +28,9 @@ test('Chinche pausa rival, Escape cancela y el rival continúa',async({page})=>{
 test('Explorador conserva partida y avanza solo jugadas legales',async({page})=>{
  await page.goto('/');await page.evaluate(()=>{cancelThinking();prefs.mode='local';game=new Chess('6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1');startFen=game.fen();cache=null;render();inspectAlert({type:'mateIn1',confidence:'verified',message:'Mate de pasillo',squares:['e1','e8'],lines:[['e1','e8']],variation:['e1e8']});});
  const fen=await page.evaluate(()=>game.fen());await page.locator('#exploreAlert').tap();
- await expect(page.locator('#assistBody .assist-mark')).toHaveCount(2);await page.locator('#exploreNext').tap();await expect(page.locator('#exploreStep')).toContainText('Re8#');
+ await expect(page.locator('#assistBody .assist-mark')).toHaveCount(2);
+ const board=await page.locator('#assistBody .mini-board').boundingBox(),lines=await page.locator('#assistBody .assist-lines').boundingBox();expect(Math.abs(board.width-lines.width)).toBeLessThan(1);
+await page.locator('#exploreNext').tap();await expect(page.locator('#exploreStep')).toContainText('Re8#');
  await expect(page.locator('#exploreNext')).toBeDisabled();expect(await page.evaluate(()=>game.fen())).toBe(fen);
  await page.locator('#exploreReport').tap();await page.locator('#pinComment').fill('Revisar explicación');await page.locator('#pinSave').tap();
  expect(await page.evaluate(()=>pinReports[0].snapshot.context)).toBe('explorer');

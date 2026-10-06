@@ -32,15 +32,15 @@ try{
  if(raw){try{const value=validateBackup(JSON.parse(raw));game=value.restored;startFen=value.startFen;prefs=value.prefs;trainingMetadata=value.metadata;practiceProgress=mergePracticeProgress(practiceProgress,value.practiceProgress);}
  catch(error){startupNotice='No se pudo recuperar la partida guardada. Se conserva su copia original hasta que guardes una nueva partida.';}}
 }catch(error){storageOK=false;}
-function save(){try{localStorage.setItem('ajedrez-pistas-v1',JSON.stringify(backupData()));storageOK=true;}catch(error){storageOK=false;}}
+function save(){if(typeof onlineIsPlaying==='function'&&onlineIsPlaying())return;if(typeof onlineQueueSave==='function')onlineQueueSave();try{localStorage.setItem('ajedrez-pistas-v1',JSON.stringify(backupData()));storageOK=true;}catch(error){storageOK=false;}}
 function downloadText(name,text,type){
  const url=URL.createObjectURL(new Blob([text],{type:type||'text/plain;charset=utf-8'}));
  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 function exportBackup(){downloadText('ajedrex-partida.json',JSON.stringify(backupData(),null,2),'application/json');}
-function importBackup(value){
- const checked=validateBackup(value);cancelThinking();game=checked.restored;startFen=checked.startFen;prefs=checked.prefs;trainingMetadata=checked.metadata;practiceProgress=mergePracticeProgress(practiceProgress,checked.practiceProgress);savePracticeProgress();
+function importBackup(value,options={}){
+ const checked=validateBackup(value);if(!options.preserveOnlineId&&typeof onlineNewGame==='function')onlineNewGame();cancelThinking();game=checked.restored;startFen=checked.startFen;prefs=checked.prefs;trainingMetadata=checked.metadata;practiceProgress=mergePracticeProgress(practiceProgress,checked.practiceProgress);savePracticeProgress();
  selected=null;focusAlert=null;cache=null;save();closeSheet();render();queueOpponent();
 }
 const PIECE_ART={"p":"<circle cx=\"50\" cy=\"24\" r=\"10\"/><path d=\"M43 34h14l-3 8c-1 12 5 22 13 28H33c8-6 14-16 13-28z\"/><path d=\"M31 71h38l4 12H27z\"/>","r":"<path d=\"M27 17h11v12h8V17h9v12h8V17h11v23l-11 8 3 23H34l3-23-10-8z\"/><path d=\"M31 71h38l4 12H27z\"/><path d=\"M35 42h30M35 66h30\" fill=\"none\"/>","n":"<path d=\"M31 70c0-15 17-21 23-30l-15 8-13-8 12-19 11-5 7-7 3 12c13 8 16 24 13 49z\"/><path d=\"M31 71h40l3 12H27z\"/><path d=\"M59 27c10 12 8 26 4 35\" fill=\"none\"/><circle cx=\"45\" cy=\"29\" r=\"2.2\" fill=\"currentColor\" stroke=\"none\"/>","b":"<path d=\"M50 12c-17 12-22 25-6 36l-4 22h20l-4-22C72 37 67 24 50 12z\"/><path d=\"M54 23l-9 14M37 49h26\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/><circle cx=\"50\" cy=\"10\" r=\"3\"/>","q":"<path d=\"M26 29l13 13 11-18 11 18 13-13-9 38H35z\"/><circle cx=\"25\" cy=\"25\" r=\"5\"/><circle cx=\"50\" cy=\"20\" r=\"5\"/><circle cx=\"75\" cy=\"25\" r=\"5\"/><path d=\"M35 57h30M33 67h34\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/>","k":"<path d=\"M46 9h8v8h8v8h-8v10h-8V25h-8v-8h8z\"/><path d=\"M49 38c-16-19-31-2-19 12l8 17h24l8-17c12-14-3-31-19-12z\"/><path d=\"M35 58h30M34 67h32\" fill=\"none\"/><path d=\"M31 71h38l4 12H27z\"/>"};
@@ -215,7 +215,7 @@ function render(){
  }
  $('storageNote').textContent=storageOK?'Guardado en este navegador. Exporta una copia desde Partida para conservarla.':'Esta vista no permite guardar automáticamente. Conserva tu partida copiando el PGN.';
  $('engineNote').textContent=prefs.mode==='ai'?engineMode+' · dificultad orientativa, sin Elo certificado':'Partida local en el mismo teléfono';
- renderInsights();scheduleTacticalAnalysis();renderThemeSummary(alerts);
+ renderInsights();scheduleTacticalAnalysis();renderThemeSummary(alerts);if(typeof onlinePaint==='function')onlinePaint();
 }
 let previousFocus=null;
 function openSheet(title,html){
@@ -225,7 +225,7 @@ function openSheet(title,html){
  document.body.style.overflow='hidden';$('closeSheet').focus();
 }
 function closeSheet(){ if(assistancePaused)return; $('veil').classList.remove('open');$('veil').setAttribute('aria-hidden','true');document.body.style.overflow='';pendingPromotion=null;if(reviewPaused){stopReviewAnalysis();reviewPaused=false;queueOpponent();scheduleLiveEvaluation();scheduleTacticalAnalysis();}finishPractice();if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}
-function toggleTheme(id,on){if(!ACTIVE_THEMES.includes(id))return;if(on){if(!prefs.enabled.includes(id))prefs.enabled.push(id);}else prefs.enabled=prefs.enabled.filter(x=>x!==id);focusAlert=null;save();render();}
+function toggleTheme(id,on){if(typeof onlineAllowsHints==='function'&&!onlineAllowsHints())return;if(!ACTIVE_THEMES.includes(id))return;if(on){if(!prefs.enabled.includes(id))prefs.enabled.push(id);}else prefs.enabled=prefs.enabled.filter(x=>x!==id);focusAlert=null;save();render();}
 
 function openHelps(){
  const groups=[...new Set(CATALOG.map(t=>t.group))];
@@ -264,8 +264,9 @@ function showAlerts(filter={}){
  if($('enableHelps'))$('enableHelps').onclick=openHelps;
 }
 function cancelThinking(){stopTacticalAnalysis();cancelLiveEvaluation();job++;if(watchdogTimer)clearTimeout(watchdogTimer);watchdogTimer=null;if(worker){worker.terminate();worker=null;}if(fallbackTimer)clearTimeout(fallbackTimer);fallbackTimer=null;busy=false;}
-function makeMove(m){if(assistancePaused||boardInspect)return false;const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!assistancePaused&&!boardInspect&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
+function makeMove(m){if(assistancePaused||boardInspect)return false;if(typeof onlineIsPlaying==='function'&&onlineIsPlaying())return onlineSubmitMove(m);const made=game.move(m);if(!made)return false;selected=null;focusAlert=null;cache=null;save();render();animateMove(made);queueOpponent();if(game.game_over()){const finalFen=game.fen();setTimeout(()=>{if(game.fen()===finalFen&&game.game_over()&&!reviewPaused&&!practicePaused&&!assistancePaused&&!boardInspect&&!$('veil').classList.contains('open'))openGameReview();},650);}return true;}
 function queueOpponent(){
+ if(typeof onlineIsPlaying==='function'&&onlineIsPlaying())return;
  if(prefs.mode!=='ai'||game.turn()===prefs.human||game.game_over()||busy||reviewPaused||practicePaused||assistancePaused||boardInspect)return;
  stopTacticalAnalysis();cancelLiveEvaluation();busy=true;const id=++job,fen=game.fen(),startedAt=Date.now();render();
  const lv=Number(prefs.level),config=[null,{ms:70,depth:1},{ms:150,depth:2},{ms:400,depth:4},{ms:850,depth:6},{ms:1400,depth:10}][lv];
@@ -295,6 +296,7 @@ function queueOpponent(){
  }catch(e){fallback();}
 }
 function tapSquare(s,isBadge){
+ if(typeof onlineBlocked==='function'&&onlineBlocked()&&!boardInspect)return;
  if(boardInspect){showAlerts({square:s,related:true});return;}
  const alerts=visibleAlerts();
  if(isBadge){const candidates=alerts.filter(a=>a.squares[0]===s);if(candidates.length){const index=focusAlert?candidates.findIndex(a=>JSON.stringify(a)===JSON.stringify(focusAlert)):-1;focusAlert=candidates[(index+1)%candidates.length];render();return;}}
@@ -313,6 +315,7 @@ function tapSquare(s,isBadge){
  const p=game.get(s);selected=p&&p.color===game.turn()?(selected===s?null:s):null;focusAlert=null;render();
 }
 function undoMove(){
+ if(typeof onlineIsPlaying==='function'&&onlineIsPlaying())return;
  if(prefs.mode==='ai'&&!game.history({verbose:true}).some(m=>m.color===prefs.human))return;
  cancelThinking();
  const h=game.history();if(!h.length)return;
@@ -320,10 +323,11 @@ function undoMove(){
  selected=null;focusAlert=null;cache=null;save();render();queueOpponent();
 }
 function openSettings(){
+ if(typeof onlineIsPlaying==='function'&&onlineIsPlaying()){openOnline();return;}
  openSheet('Tu partida','<p>Configura la siguiente partida. El nivel del rival y las ayudas se eligen por separado.</p><label class="field" for="modeSelect">Rival</label><select class="fieldselect" id="modeSelect"><option value="ai" '+(prefs.mode==='ai'?'selected':'')+'>GarboChess · motor gratuito</option><option value="local" '+(prefs.mode==='local'?'selected':'')+'>Otra persona en este iPhone</option></select><label class="field" for="colorSelect">Jugar con</label><select class="fieldselect" id="colorSelect"><option value="w" '+(prefs.human==='w'?'selected':'')+'>Blancas</option><option value="b" '+(prefs.human==='b'?'selected':'')+'>Negras</option></select><label class="field" for="levelSelect">Dificultad del rival</label><select class="fieldselect" id="levelSelect">'+['Iniciación','Suave','Intermedio','Exigente','Máximo de esta prueba'].map((n,i)=>'<option value="'+(i+1)+'" '+(Number(prefs.level)===i+1?'selected':'')+'>'+(i+1)+' · '+n+'</option>').join('')+'</select><p class="small">GarboChess ajusta profundidad y tiempo de cálculo. Iniciación también intercala jugadas aleatorias. Los niveles no equivalen a un Elo oficial.</p><div class="btnrow"><button class="soft" id="applyLevel">Cambiar nivel actual</button><button class="primary" id="newGame">Comenzar nueva partida</button></div><p class="small">Comenzar otra partida sustituye la actual. Puedes copiar el PGN antes.</p><div class="group">Historial actual</div><div class="movehistory">'+esc(game.history().map((m,i)=>(i%2===0?(Math.floor(i/2)+1)+'. ':'')+m).join(' ')||'Todavía no hay jugadas.')+'</div><div class="btnrow"><button id="copyPGN">Copiar PGN</button><button id="flipBoard">Girar tablero</button></div><div class="group">Copia de seguridad</div><p class="small">El repositorio conserva el código. Tus partidas se guardan en este navegador; descarga una copia para trasladarlas o recuperarlas.</p><div class="btnrow"><button id="exportBackup">Exportar partida</button><button id="importBackup">Importar partida</button></div><input id="backupFile" type="file" accept=".json,application/json" class="hidden"><p class="small" id="backupStatus" role="status"></p><div class="btnrow"><button id="about">Sobre esta versión</button></div>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
  $('applyLevel').onclick=()=>{cancelThinking();prefs.level=Number($('levelSelect').value);save();closeSheet();render();queueOpponent();};
- $('newGame').onclick=()=>{if(game.history().length&&!window.confirm('¿Comenzar otra partida y sustituir la actual?'))return;cancelThinking();prefs.mode=$('modeSelect').value;prefs.human=$('colorSelect').value;prefs.level=Number($('levelSelect').value);prefs.flipped=prefs.human==='b';game=new Chess();startFen=game.fen();trainingMetadata=null;selected=null;focusAlert=null;cache=null;save();closeSheet();render();queueOpponent();};
+ $('newGame').onclick=()=>{if(game.history().length&&!window.confirm('¿Comenzar otra partida y sustituir la actual?'))return;if(typeof onlineNewGame==='function')onlineNewGame();cancelThinking();prefs.mode=$('modeSelect').value;prefs.human=$('colorSelect').value;prefs.level=Number($('levelSelect').value);prefs.flipped=prefs.human==='b';game=new Chess();startFen=game.fen();trainingMetadata=null;selected=null;focusAlert=null;cache=null;save();closeSheet();render();queueOpponent();};
  $('flipBoard').onclick=()=>{prefs.flipped=!prefs.flipped;save();render();closeSheet();};
  $('copyPGN').onclick=async()=>{
   const text=game.pgn()||'[Event "Ajedrez con pistas"]\n\n*';
@@ -342,7 +346,7 @@ function openSettings(){
  $('about').onclick=openAbout;
 }
 function openAbout(){
- openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.7</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
+ openSheet('Sobre Ajedrex','<p><strong>Ajedrex · v0.8</strong><br>Tablero táctil, reglas legales, rival GarboChess, 81 controles con iconos propios, barra de ventaja y revisión de partidas.</p><p>Proyecto personal de hobby. Abre su dirección web en Safari; puedes usar Compartir → Añadir a pantalla de inicio. La primera carga necesita conexión. El indicador inferior confirma cuándo está preparada la copia sin conexión.</p><p>Las alertas distinguen hechos comprobados, patrones y posibilidades. La búsqueda tiene límite de tiempo; Ampliar análisis permite explorar más. Las etiquetas de origen requieren datos de ejercicios importados. Hay 60 prácticas guiadas locales, una por tema táctico, con progreso y retorno a la partida. Stockfish y un banco de ejercicios en línea no están incluidos. GarboChess está incluido en los archivos del proyecto. Los patrones geométricos no prometen ganar material. Las reglas de tablas por repetición y 50 jugadas se aplican automáticamente en esta prueba.</p><p>Fuentes: <a href="https://github.com/glinscott/Garbochess-JS" target="_blank" rel="noopener">GarboChess</a>, <a href="https://github.com/jhlywa/chess.js/tree/v0.13.4" target="_blank" rel="noopener">chess.js 0.13.4</a> y <a href="https://github.com/lichess-org/lila/blob/master/translation/source/puzzleTheme.xml" target="_blank" rel="noopener">temas de Lichess</a>.</p><details class="topic"><summary>Licencias de los componentes</summary><pre class="legal">'+esc(LICENSE_TEXT)+'</pre></details>');
  $('sheetBody').onclick=null;$('sheetBody').onchange=null;
 }
 function openLessons(){openPracticeGallery();}
@@ -355,7 +359,7 @@ function dropSquare(x,y){
  return String.fromCharCode(97+(prefs.flipped?7-col:col))+(prefs.flipped?row+1:8-row);
 }
 $('board').onpointerdown=e=>{
- if(boardInspect||assistancePaused||busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human)||e.button>0||e.target.closest('[data-alert-square]'))return;
+ if((typeof onlineBlocked==='function'&&onlineBlocked())||boardInspect||assistancePaused||busy||game.game_over()||(prefs.mode==='ai'&&game.turn()!==prefs.human)||e.button>0||e.target.closest('[data-alert-square]'))return;
  const button=e.target.closest('[data-square]');if(!button)return;const from=button.dataset.square,p=game.get(from);if(!p||p.color!==game.turn())return;
  drag={from,p,id:e.pointerId,x:e.clientX,y:e.clientY,active:false,ghost:null};
  };

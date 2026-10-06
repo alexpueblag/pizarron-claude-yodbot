@@ -114,3 +114,8 @@ Consulta [la auditoría y ruta hacia 5.5](RUTA-5.5.md) para peticiones cubiertas
 Menú abre un panel lateral con búsqueda, acceso a todas las secciones y ajustes rápidos. Se puede cerrar con X, Escape o tocando fuera; el rival espera mientras está abierto.
 
 El tablero comienza en **Jugar**: los iconos son visibles pero dejan pasar el toque a la casilla, incluida su esquina, para seleccionar, mover y arrastrar. **Consultar alertas** pausa la partida y convierte el toque en consulta, sin mover piezas; toca Jugar para continuar. Las 81 preferencias se conservan. El modo de consulta no persiste tras recargar, para evitar dejar la partida pausada sin querer.
+
+
+## Preparación v0.8: Sheets y amigos
+
+Backend de Apps Script y cliente de invitaciones, salas y cola de guardado. **No está activado en producción** mientras online-config.json tenga endpoint vacío; la interfaz lo indica y mantiene el juego local. La hoja privada fue creada desde la conexión Google del propietario. Consultar [activación y pruebas](backend/INSTALAR.md). Las pruebas aisladas no sustituyen la comprobación del deployment Google con dos navegadores.

@@ -2,6 +2,7 @@
 function openNavigation(){
  const actions=[
  ['resume','♟','Volver al tablero','Continuar la partida'],
+ ['friends','♧','Amigos y guardado','Invitaciones, salas privadas y respaldo'],
  ['helps','☷','Ayudas e iconos','Encender o apagar cada táctica · '+prefs.enabled.length+' activas'],
  ['practice','◇','Practicar','60 temas con prácticas guiadas'],
  ['review','▥','Analizar partida','Revisar jugadas, ventaja y capturas'],
@@ -36,7 +37,7 @@ function openNavigation(){
   if(action==='backup'){try{exportBackup();$('menuStatus').textContent='Copia preparada. Guárdala en Archivos o iCloud Drive.';}catch(error){$('menuStatus').textContent='No se pudo descargar. Abre Partida para copiar el PGN.';}return;}
   if(action==='review'&&!game.history().length){$('menuStatus').textContent='Haz alguna jugada para poder analizar la partida.';return;}
   assistClose();
-  const routes={resume:()=>{},helps:openHelps,practice:openLessons,review:openGameReview,settings:openSettings,catalog:openCatalog,pins:pinHome};
+  const routes={friends:openOnline,resume:()=>{},helps:openHelps,practice:openLessons,review:openGameReview,settings:openSettings,catalog:openCatalog,pins:pinHome};
   routes[action]?.();
  };
 }
